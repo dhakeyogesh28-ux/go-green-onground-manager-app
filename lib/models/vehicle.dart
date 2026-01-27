@@ -106,6 +106,11 @@ class Vehicle {
   final String? variant;
   final String? primaryHubId;
   final DateTime? createdAt;
+  
+  // Stored in daily_checks JSONB
+  final String? driverRemark;
+  final String? odometerReading;
+  final String? ridePurpose;
 
   Vehicle({
     required this.id,
@@ -138,6 +143,9 @@ class Vehicle {
     this.variant,
     this.primaryHubId,
     this.createdAt,
+    this.driverRemark,
+    this.odometerReading,
+    this.ridePurpose,
   });
 
   String get statusText {
@@ -163,6 +171,11 @@ class Vehicle {
         parsedDailyChecks[key.toString()] = value == true;
       });
     }
+
+    // Extract driver_remark, odometer_reading, and ride_purpose from daily_checks if they exist there
+    final String? driverRemark = rawDailyChecks is Map ? rawDailyChecks['driver_remark']?.toString() : null;
+    final String? odometerReading = rawDailyChecks is Map ? rawDailyChecks['odometer_reading']?.toString() : null;
+    final String? ridePurpose = rawDailyChecks is Map ? rawDailyChecks['ride_purpose']?.toString() : null;
 
     // Interior cleaning status can be top level or inside daily checks
     final bool topLevelInteriorClean = (json['is_interior_clean'] ?? json['isInteriorClean']) == true;
@@ -207,6 +220,9 @@ class Vehicle {
       variant: json['variant']?.toString(),
       primaryHubId: json['primary_hub_id']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
+      driverRemark: driverRemark,
+      odometerReading: odometerReading,
+      ridePurpose: ridePurpose,
     );
   }
 
@@ -241,6 +257,9 @@ class Vehicle {
       'model': model,
       'variant': variant,
       'primary_hub_id': primaryHubId,
+      'driver_remark': driverRemark,
+      'odometer_reading': odometerReading,
+      'ride_purpose': ridePurpose,
     };
   }
 
@@ -292,6 +311,9 @@ class Vehicle {
     String? servicingStatus,
     DateTime? lastCheckInTime,
     DateTime? lastCheckOutTime,
+    String? driverRemark,
+    String? odometerReading,
+    String? ridePurpose,
   }) {
     return Vehicle(
       id: id ?? this.id,
@@ -324,6 +346,9 @@ class Vehicle {
       variant: this.variant,
       primaryHubId: this.primaryHubId,
       createdAt: this.createdAt,
+      driverRemark: driverRemark ?? this.driverRemark,
+      odometerReading: odometerReading ?? this.odometerReading,
+      ridePurpose: ridePurpose ?? this.ridePurpose,
     );
   }
 }

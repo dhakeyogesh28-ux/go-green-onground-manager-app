@@ -475,7 +475,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
       
       // 2. Save inspection checklist to database
-      final Map<String, bool> cleanedChecklist = {};
+      final Map<String, dynamic> cleanedChecklist = {};
       final List<String> issueItems = []; // Track items marked as Issue
       
       _inspectionChecklist.forEach((key, value) {
@@ -566,6 +566,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
+      
+      // Store odometer within daily_checks map to avoid missing column error
+      cleanedChecklist['odometer_reading'] = _odometerController.text.trim();
+      cleanedChecklist['ride_purpose'] = _ridePurpose;
+
       try {
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
           'is_vehicle_in': false,
@@ -579,8 +584,6 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           'last_inspection_date': DateTime.now().toIso8601String().split('T')[0],
           'service_attention': issueItems.isNotEmpty, // Flag for attention if issues found
           'last_check_out_time': DateTime.now().toIso8601String(), // Track check-out time
-          'odometer_reading': _odometerController.text.trim(),
-          'ride_purpose': _ridePurpose,
         });
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {

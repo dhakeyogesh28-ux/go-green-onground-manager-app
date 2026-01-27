@@ -554,7 +554,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       await _updateDCChargeCount();
       
       // 2. Save inspection checklist to database
-      final Map<String, bool> cleanedChecklist = {};
+      final Map<String, dynamic> cleanedChecklist = {};
       final List<String> issueItems = []; // Track items marked as Issue
       
       _inspectionChecklist.forEach((key, value) {
@@ -647,8 +647,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
       
-      // Store interior cleaning status within daily_checks map to avoid missing column error
+      // Store interior cleaning status, remark and odometer within daily_checks map to avoid missing column error
       cleanedChecklist['interior_clean'] = _isInteriorClean;
+      cleanedChecklist['driver_remark'] = _remarkController.text.trim();
+      cleanedChecklist['odometer_reading'] = _odometerController.text.trim();
+      cleanedChecklist['ride_purpose'] = _ridePurpose;
 
       try {
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
@@ -663,9 +666,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
           'last_inspection_date': DateTime.now().toIso8601String().split('T')[0],
           'service_attention': issueItems.isNotEmpty, // Flag for attention if issues found
           'last_check_in_time': DateTime.now().toIso8601String(), // Track check-in time
-          'driver_remark': _remarkController.text.trim(),
-          'odometer_reading': _odometerController.text.trim(),
-          'ride_purpose': _ridePurpose,
         });
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {

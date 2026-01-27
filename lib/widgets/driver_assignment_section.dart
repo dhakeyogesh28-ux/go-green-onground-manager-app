@@ -7,6 +7,7 @@ import 'package:mobile/theme.dart';
 class DriverAssignmentSection extends StatefulWidget {
   final String? vehicleId;
   final String? hubId;
+  final String title;
   final Function(Driver?) onDriverSelected;
   final Driver? initialDriver;
 
@@ -14,6 +15,7 @@ class DriverAssignmentSection extends StatefulWidget {
     super.key,
     this.vehicleId,
     this.hubId,
+    this.title = 'Assigned Driver',
     required this.onDriverSelected,
     this.initialDriver,
   });
@@ -143,9 +145,9 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
               color: AppTheme.primaryBlue,
             ),
             const SizedBox(width: 8),
-            const Text(
-              'Assigned Driver',
-              style: TextStyle(
+            Text(
+              widget.title,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF111827),

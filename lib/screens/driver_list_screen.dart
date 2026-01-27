@@ -32,16 +32,14 @@ class _DriverListScreenState extends State<DriverListScreen> {
     super.dispose();
   }
 
-  List<Driver> _filterDrivers(List<Driver> drivers) {
+  List<Driver> _filterDrivers(List<Driver> drivers, Map<String, String> statuses) {
     var filtered = drivers;
 
     // Filter by tab
     if (_selectedTab == 'Active') {
       filtered = filtered.where((d) => d.isActive).toList();
     } else if (_selectedTab == 'Present') {
-      // Logic for "Present" might depend on attendance records, 
-      // for now we'll just show active drivers if no specific flag
-      filtered = filtered.where((d) => d.isActive).toList();
+      filtered = filtered.where((d) => statuses[d.id] == 'Present').toList();
     }
 
     // Filter by search query
@@ -60,7 +58,8 @@ class _DriverListScreenState extends State<DriverListScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final allDrivers = provider.drivers;
-    final drivers = _filterDrivers(allDrivers);
+    final statuses = provider.driverStatuses;
+    final drivers = _filterDrivers(allDrivers, statuses);
     final isLoading = provider.isLoadingDrivers;
 
     return Scaffold(
@@ -122,7 +121,7 @@ class _DriverListScreenState extends State<DriverListScreen> {
                 const SizedBox(width: 8),
                 _buildTab('Active', allDrivers.where((d) => d.isActive).length),
                 const SizedBox(width: 8),
-                _buildTab('Present', 0), // Placeholder for now
+                _buildTab('Present', allDrivers.where((d) => statuses[d.id] == 'Present').length), 
               ],
             ),
           ),
@@ -137,7 +136,10 @@ class _DriverListScreenState extends State<DriverListScreen> {
                         padding: const EdgeInsets.all(16),
                         itemCount: drivers.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) => _DriverCard(driver: drivers[index]),
+                        itemBuilder: (context, index) => _DriverCard(
+                          driver: drivers[index],
+                          status: statuses[drivers[index].id] ?? 'Absent',
+                        ),
                       ),
           ),
         ],
@@ -190,7 +192,8 @@ class _DriverListScreenState extends State<DriverListScreen> {
 
 class _DriverCard extends StatelessWidget {
   final Driver driver;
-  const _DriverCard({required this.driver});
+  final String status;
+  const _DriverCard({required this.driver, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -246,12 +249,16 @@ class _DriverCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: status == 'Present' ? AppTheme.successGreen.withOpacity(0.1) : Colors.grey[200],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Absent',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              child: Text(
+                status,
+                style: TextStyle(
+                  fontSize: 12, 
+                  color: status == 'Present' ? AppTheme.successGreen : Colors.grey,
+                  fontWeight: status == 'Present' ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
             ),
             const SizedBox(width: 8),

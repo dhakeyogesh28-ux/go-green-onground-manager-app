@@ -17,15 +17,32 @@ class DriverService {
 
     try {
       debugPrint('🔍 Looking up hub ID for name: $hub');
+      // Use partial matching for more robustness
       final response = await _client
           .from('hubs')
-          .select('hub_id')
-          .ilike('hub_name', hub)
+          .select('hub_id, hub_name')
+          .ilike('hub_name', '%$hub%') // Partial match
+          .limit(1) // Just take the first match if multiple exist
           .maybeSingle();
       
       if (response != null) {
-        return response['hub_id'];
+        debugPrint('✅ Resolved hub ID: ${response['hub_id']} for "${response['hub_name']}" (Query: $hub)');
+        return response['hub_id'] as String;
       }
+      
+      // Try exact match as fallback
+      final exactResponse = await _client
+          .from('hubs')
+          .select('hub_id')
+          .ilike('hub_name', hub)
+          .limit(1)
+          .maybeSingle();
+          
+      if (exactResponse != null) {
+        return exactResponse['hub_id'] as String;
+      }
+      
+      debugPrint('⚠️ No hub found matching: $hub');
     } catch (e) {
       debugPrint('⚠️ Error resolving hub ID: $e');
     }
@@ -42,9 +59,14 @@ class DriverService {
           .select('*')
           .eq('is_active', true);
       
-      // Filter by hub if provided
-      if (hubId != null && hubId.isNotEmpty) {
-        queryBuilder = queryBuilder.eq('hub_id', hubId);
+      // Resolve hub name to ID if necessary
+      final resolvedHubId = hubId != null ? await _resolveHubId(hubId) : null;
+      
+      // Filter by hub if provided and resolved
+      if (resolvedHubId != null) {
+        queryBuilder = queryBuilder.eq('hub_id', resolvedHubId);
+      } else if (hubId != null && hubId.isNotEmpty) {
+        debugPrint('⚠️ searchDrivers: Could not resolve hub: $hubId. Proceeding with global search.');
       }
       
       // Search by name or phone number
@@ -77,23 +99,25 @@ class DriverService {
       
       // Resolve hub name to ID if necessary
       final resolvedHubId = await _resolveHubId(hubId);
-      if (resolvedHubId == null && hubId.isNotEmpty) {
-        debugPrint('⚠️ Could not resolve hub: $hubId');
-        return [];
+      
+      var query = _client.from('drivers').select('*').eq('is_active', true);
+      
+      if (resolvedHubId != null) {
+        debugPrint('📡 Fetching drivers for resolved hub_id: $resolvedHubId');
+        query = query.eq('hub_id', resolvedHubId);
+      } else if (hubId.isNotEmpty) {
+        debugPrint('⚠️ Could not resolve hub: $hubId. Fetching all active drivers as fallback.');
+        // If we can't resolve the hub, we still want to show drivers to avoid "disappearing" issue
+        // Alternatively, we could filter by hub ID if it was already a UUID but resolution failed
       }
       
-      final response = await _client
-          .from('drivers')
-          .select('*')
-          .eq('hub_id', resolvedHubId ?? '')
-          .eq('is_active', true)
-          .order('driver_name', ascending: true);
+      final response = await query.order('driver_name', ascending: true);
       
       final drivers = (response as List)
           .map((json) => Driver.fromJson(json))
           .toList();
       
-      debugPrint('✅ Found ${drivers.length} drivers for hub');
+      debugPrint('✅ Found ${drivers.length} drivers');
       return drivers;
     } catch (e) {
       debugPrint('❌ Error fetching drivers by hub: $e');
@@ -285,6 +309,37 @@ class DriverService {
     } catch (e) {
       debugPrint('❌ Error updating driver: $e');
       throw Exception('Error updating driver: $e');
+    }
+  }
+
+  /// Get the latest attendance status for all drivers in a hub
+  static Future<Map<String, String>> getDriverStatuses(String hubId) async {
+    try {
+      final resolvedHubId = await _resolveHubId(hubId);
+      if (resolvedHubId == null) return {};
+
+      // Fetch latest check-in/out for each driver
+      final response = await _client
+          .from('driver_attendance')
+          .select('driver_id, activity_type, timestamp')
+          .order('timestamp', ascending: false)
+          .limit(200);
+
+      final Map<String, String> statusMap = {};
+      final List<dynamic> records = response as List;
+
+      for (var record in records) {
+        final dId = record['driver_id']?.toString();
+        if (dId != null && !statusMap.containsKey(dId)) {
+          // Because it's ordered by timestamp desc, the first one we see is the latest
+          statusMap[dId] = record['activity_type'] == 'check_in' ? 'Present' : 'Absent';
+        }
+      }
+
+      return statusMap;
+    } catch (e) {
+      debugPrint('❌ Error fetching driver statuses: $e');
+      return {};
     }
   }
 

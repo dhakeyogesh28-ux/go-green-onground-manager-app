@@ -53,6 +53,8 @@ class AppProvider with ChangeNotifier {
   // Drivers
   List<Driver> _drivers = [];
   List<Driver> get drivers => _drivers;
+  Map<String, String> _driverStatuses = {}; // driverId -> 'Present' or 'Absent'
+  Map<String, String> get driverStatuses => _driverStatuses;
   bool _isLoadingDrivers = false;
   bool get isLoadingDrivers => _isLoadingDrivers;
   String? _driversError;
@@ -647,8 +649,10 @@ class AppProvider with ChangeNotifier {
         _drivers = await DriverService.searchDrivers('');
       } else {
         _drivers = await DriverService.getDriversByHub(_selectedHub!);
+        // Also fetch statuses
+        _driverStatuses = await DriverService.getDriverStatuses(_selectedHub!);
       }
-      debugPrint('✅ AppProvider: Loaded ${_drivers.length} drivers');
+      debugPrint('✅ AppProvider: Loaded ${_drivers.length} drivers and ${_driverStatuses.length} statuses');
     } catch (e) {
       debugPrint('❌ AppProvider: Error loading drivers: $e');
       _driversError = e.toString();

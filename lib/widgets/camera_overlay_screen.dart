@@ -42,6 +42,15 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
     'dikki_trunk': 'Capture the trunk/dikki interior',
     'tool_kit': 'Capture the tool kit contents',
     'valuables_check': 'Capture any valuables or important items',
+    'odometer': 'Capture a clear photo of the odometer',
+    'stepney_tyre': 'Capture the stepney tyre condition',
+    'umbrella': 'Capture the umbrella (if present)',
+    'battery': 'Capture the vehicle battery',
+    'engine_compartment': 'Capture the engine compartment area',
+    'corner_view_1': 'Capture front-left corner view',
+    'corner_view_2': 'Capture front-right corner view',
+    'corner_view_3': 'Capture rear-left corner view',
+    'corner_view_4': 'Capture rear-right corner view',
     'additional_photos': 'Capture any additional details',
   };
 

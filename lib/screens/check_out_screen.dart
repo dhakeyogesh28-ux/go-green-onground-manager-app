@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -25,10 +26,12 @@ class CheckOutScreen extends StatefulWidget {
 
 class _CheckOutScreenState extends State<CheckOutScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _odometerController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   
   Vehicle? _selectedVehicle;
   Driver? _selectedDriver;
+  String? _ridePurpose; // 'B2B' or 'B2C'
   double _batteryPercentage = 50.0;
   // Changed to tri-state: null = unchecked, true = OK, false = Issue
   final Map<String, bool?> _inspectionChecklist = {};
@@ -43,13 +46,23 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     {'id': 'exterior_rear', 'label': 'Exterior: Rear View', 'icon': LucideIcons.car},
     {'id': 'exterior_left', 'label': 'Exterior: Left Side', 'icon': LucideIcons.car},
     {'id': 'exterior_right', 'label': 'Exterior: Right Side', 'icon': LucideIcons.car},
+    {'id': 'odometer', 'label': 'Odometer Photo', 'icon': LucideIcons.gauge},
+    {'id': 'stepney_tyre', 'label': 'Stepney Tyre', 'icon': LucideIcons.disc},
+    {'id': 'umbrella', 'label': 'Umbrella', 'icon': LucideIcons.umbrella},
+    {'id': 'battery', 'label': 'Battery', 'icon': LucideIcons.battery},
+    {'id': 'engine_compartment', 'label': 'Engine Compartment', 'icon': LucideIcons.container},
+    {'id': 'corner_view_1', 'label': 'Corner View 1', 'icon': LucideIcons.maximize},
+    {'id': 'corner_view_2', 'label': 'Corner View 2', 'icon': LucideIcons.maximize},
+    {'id': 'corner_view_3', 'label': 'Corner View 3', 'icon': LucideIcons.maximize},
+    {'id': 'corner_view_4', 'label': 'Corner View 4', 'icon': LucideIcons.maximize},
     {'id': 'dents_scratches', 'label': 'Dents & Scratches', 'icon': LucideIcons.scan},
     {'id': 'interior_cabin', 'label': 'Interior / Cabin', 'icon': LucideIcons.armchair},
     {'id': 'dikki_trunk', 'label': 'Dikki / Trunk', 'icon': LucideIcons.package},
     {'id': 'tool_kit', 'label': 'Tool Kit', 'icon': LucideIcons.wrench},
     {'id': 'valuables_check', 'label': 'Valuables Check', 'icon': LucideIcons.briefcase},
-    {'id': 'additional_photos', 'label': 'Additional Photos', 'icon': LucideIcons.image, 'isOptional': true},
   ];
+
+  final List<String> _additionalPhotos = [];
 
   // EV-Specific Inspection sections
   final Map<String, List<Map<String, String>>> _inspectionSections = {
@@ -308,6 +321,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _odometerController.dispose();
     super.dispose();
   }
 
@@ -340,7 +354,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             categoryLabel: category['label'] as String,
             onPhotoTaken: (String photoPath) {
               setState(() {
-                _inventoryPhotos[categoryId] = photoPath;
+                if (categoryId == 'additional_photos') {
+                  _additionalPhotos.add(photoPath);
+                } else {
+                  _inventoryPhotos[categoryId] = photoPath;
+                }
               });
               
               // Show success message
@@ -528,8 +546,21 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             );
           } catch (e) {
             debugPrint('Warning: Could not save photo ${entry.key}: $e');
-            // Continue even if photo upload fails
           }
+        }
+      }
+
+      // Save additional photos
+      debugPrint('📸 Saving ${_additionalPhotos.length} additional photos...');
+      for (int i = 0; i < _additionalPhotos.length; i++) {
+        try {
+          await provider.setInventoryPhoto(
+            _selectedVehicle!.id,
+            'additional_photo_$i',
+            _additionalPhotos[i],
+          );
+        } catch (e) {
+          debugPrint('Warning: Could not save additional photo $i: $e');
         }
       }
       
@@ -548,6 +579,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           'last_inspection_date': DateTime.now().toIso8601String().split('T')[0],
           'service_attention': issueItems.isNotEmpty, // Flag for attention if issues found
           'last_check_out_time': DateTime.now().toIso8601String(), // Track check-out time
+          'odometer_reading': _odometerController.text.trim(),
+          'ride_purpose': _ridePurpose,
         });
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {
@@ -603,9 +636,12 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             'battery_percentage': _batteryPercentage.round(),
             'charging_type': 'AC',
             'inspection_items_checked': cleanedChecklist.length,
-            'photos_captured': _inventoryPhotos.values.where((v) => v != null).length,
+            'photos_captured': _inventoryPhotos.values.where((v) => v != null).length + _additionalPhotos.length,
+            'additional_photos_count': _additionalPhotos.length,
             'issues_reported': issueItems.length,
             'issue_details': issueItems,
+            'odometer_reading': _odometerController.text.trim(),
+            'ride_purpose': _ridePurpose,
             if (_selectedDriver != null) 'driver_id': _selectedDriver!.id,
             if (_selectedDriver != null) 'driver_name': _selectedDriver!.name,
           },
@@ -714,9 +750,35 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   if (_selectedVehicle != null) ...[
                     const SizedBox(height: 24),
                     _buildSelectedVehicle(),
+
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Purpose of Ride'),
+                    const SizedBox(height: 12),
+                    _buildRidePurposeSection(),
+
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Odometer Reading'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _odometerController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Enter current odometer reading...',
+                        prefixIcon: const Icon(LucideIcons.gauge, color: Color(0xFF9CA3AF)),
+                        filled: true,
+                        fillColor: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.white.withOpacity(0.05) 
+                            : const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                        ),
+                      ),
+                    ),
                     
                     const SizedBox(height: 24),
                     DriverAssignmentSection(
+                      title: 'Assign Driver',
                       vehicleId: _selectedVehicle!.id,
                       hubId: provider.selectedHub,
                       onDriverSelected: (driver) {
@@ -1108,6 +1170,60 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
 
 
+  Widget _buildRidePurposeSection() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPurposeButton('B2B', LucideIcons.briefcase),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildPurposeButton('B2C', LucideIcons.user),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPurposeButton(String purpose, IconData icon) {
+    final isSelected = _ridePurpose == purpose;
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _ridePurpose = isSelected ? null : purpose;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryBlue.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryBlue : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppTheme.primaryBlue : const Color(0xFF6B7280),
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              purpose,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppTheme.primaryBlue : const Color(0xFF374151),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInventoryPhotos() {
     return GridView.builder(
       shrinkWrap: true,
@@ -1148,20 +1264,22 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     if (isCaptured && photoPath != null)
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                        child: Image.file(
-                          File(photoPath),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                category['icon'] as IconData,
-                                color: Colors.grey.shade400,
-                                size: 32,
-                              ),
-                            );
-                          },
-                        ),
+                        child: kIsWeb
+                          ? Image.network(photoPath, fit: BoxFit.cover)
+                          : Image.file(
+                              File(photoPath),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(
+                                    category['icon'] as IconData,
+                                    color: Colors.grey.shade400,
+                                    size: 32,
+                                  ),
+                                );
+                              },
+                            ),
                       )
                     else
                       Container(
@@ -1408,14 +1526,14 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Required Inventory Photos',
+                      'Inventory Photos',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),
                     ),
                     Text(
-                      allPhotosCaptured ? 'All photos captured' : 'Capture all angles & details',
+                      allPhotosCaptured ? 'All required photos captured' : 'Capture all angles & details',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
@@ -1437,31 +1555,116 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           const SizedBox(height: 16),
           // Photo Grid
           _buildInventoryPhotos(),
-          const SizedBox(height: 16),
-          // Bottom Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: allPhotosCaptured ? _handleCheckOut : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: allPhotosCaptured ? Colors.orange : const Color(0xFFE5E7EB),
-                disabledBackgroundColor: const Color(0xFFE5E7EB),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                elevation: 0,
-              ),
-              child: Text(
-                allPhotosCaptured ? 'Proceed to Check Out' : 'Capture all photos to proceed',
-                style: TextStyle(
-                  color: allPhotosCaptured ? Colors.white : const Color(0xFF9CA3AF),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
+          
+          // Additional Photos Section (Nested)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1),
           ),
+          _buildAdditionalPhotosSection(),
         ],
       ),
+    );
+  }
+
+  Widget _buildAdditionalPhotosSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(LucideIcons.image, color: AppTheme.primaryBlue, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Additional Photos',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            if (_additionalPhotos.isNotEmpty)
+              Text(
+                '${_additionalPhotos.length}',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue, fontSize: 14),
+              ),
+          ],
+        ),
+        if (_additionalPhotos.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: _additionalPhotos.length,
+            itemBuilder: (context, index) {
+              final photoPath = _additionalPhotos[index];
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                            child: kIsWeb
+                                ? Image.network(photoPath, fit: BoxFit.cover)
+                                : Image.file(File(photoPath), fit: BoxFit.cover),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: InkWell(
+                              onTap: () => setState(() => _additionalPhotos.removeAt(index)),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                child: const Icon(LucideIcons.x, color: Colors.white, size: 10),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Additional',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _capturePhoto('additional_photos'),
+            icon: const Icon(LucideIcons.plus, size: 14),
+            label: const Text('Add Additional Photo'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.5)),
+              foregroundColor: AppTheme.primaryBlue,
+              backgroundColor: AppTheme.primaryBlue.withOpacity(0.05),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -10,14 +10,17 @@ class NumberPlateCameraScreen extends StatefulWidget {
   const NumberPlateCameraScreen({super.key});
 
   @override
-  State<NumberPlateCameraScreen> createState() => _NumberPlateCameraScreenState();
+  State<NumberPlateCameraScreen> createState() =>
+      _NumberPlateCameraScreenState();
 }
 
-class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
+class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen>
+    with WidgetsBindingObserver {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
   bool _isInitialized = false;
   bool _isProcessing = false;
+  bool _isDisposing = false;
   final TextRecognizer _textRecognizer = TextRecognizer();
   String _detectedText = '';
   bool _plateDetected = false;
@@ -25,61 +28,111 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final CameraController? controller = _controller;
+
+    // App state changed before we got the controller
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      // Free up resources when app is inactive
+      _disposeCamera();
+    } else if (state == AppLifecycleState.resumed) {
+      // Reinitialize camera when app is resumed
+      _initializeCamera();
+    }
+  }
+
   Future<void> _initializeCamera() async {
+    if (_isDisposing) return;
+
     try {
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
         throw Exception('No cameras available');
       }
 
+      // Dispose previous controller if exists
+      await _disposeCamera();
+      if (!mounted || _isDisposing) return;
+
       _controller = CameraController(
         _cameras![0],
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _controller!.initialize();
-      
-      if (mounted) {
+
+      if (mounted && !_isDisposing) {
         setState(() {
           _isInitialized = true;
         });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Camera error: $e')),
-        );
+      debugPrint('Camera error: $e');
+      if (mounted && !_isDisposing) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Camera error: $e')));
         Navigator.pop(context);
       }
     }
   }
 
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    if (controller != null) {
+      _controller = null;
+      if (mounted) {
+        setState(() {
+          _isInitialized = false;
+        });
+      }
+      try {
+        await controller.dispose();
+      } catch (e) {
+        debugPrint('Error disposing camera: $e');
+      }
+    }
+  }
+
   Future<void> _captureAndProcess() async {
-    if (_isProcessing || _controller == null || !_controller!.value.isInitialized) return;
-    
+    if (_isProcessing ||
+        _controller == null ||
+        !_controller!.value.isInitialized ||
+        _isDisposing)
+      return;
+
     setState(() {
       _isProcessing = true;
     });
 
     try {
       final XFile photo = await _controller!.takePicture();
-      
+
       // Process image with ML Kit Text Recognition
       final inputImage = InputImage.fromFilePath(photo.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-      
+      final RecognizedText recognizedText = await _textRecognizer.processImage(
+        inputImage,
+      );
+
       // Extract and validate plate number
       String? plateNumber = _extractPlateNumber(recognizedText.text);
-      
-      if (plateNumber != null && mounted) {
+
+      if (plateNumber != null && mounted && !_isDisposing) {
         // Return the detected plate number
         Navigator.pop(context, plateNumber);
       } else {
-        if (mounted) {
+        if (mounted && !_isDisposing) {
           setState(() {
             _detectedText = 'No valid plate number detected. Please try again.';
             _plateDetected = false;
@@ -87,13 +140,13 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+      if (mounted && !_isDisposing) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
-      if (mounted) {
+      if (mounted && !_isDisposing) {
         setState(() {
           _isProcessing = false;
         });
@@ -104,16 +157,16 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
   String? _extractPlateNumber(String text) {
     // Remove whitespace and convert to uppercase
     String cleanText = text.replaceAll(RegExp(r'\s+'), '').toUpperCase();
-    
+
     // Indian plate format: 2 letters + 2 digits + 1-2 letters + 4 digits
     // Examples: MH12AB1234, DL01CA9999, KA03MH6789
     RegExp platePattern = RegExp(r'[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}');
-    
+
     Match? match = platePattern.firstMatch(cleanText);
     if (match != null) {
       return match.group(0);
     }
-    
+
     // Try alternate patterns
     // Format with spaces: MH 12 AB 1234
     String textWithSpaces = text.toUpperCase();
@@ -122,12 +175,14 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
     if (spaceMatch != null) {
       return spaceMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
     }
-    
+
     return null;
   }
 
   @override
   void dispose() {
+    _isDisposing = true;
+    WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
     _textRecognizer.close();
     super.dispose();
@@ -142,9 +197,7 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
           : Stack(
               children: [
                 // Live Camera Preview
-                Positioned.fill(
-                  child: CameraPreview(_controller!),
-                ),
+                Positioned.fill(child: CameraPreview(_controller!)),
 
                 // Number Plate Outline Guide
                 Positioned.fill(
@@ -154,14 +207,18 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
                       height: MediaQuery.of(context).size.width * 0.25,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _plateDetected ? AppTheme.successGreen : Colors.white,
+                          color: _plateDetected
+                              ? AppTheme.successGreen
+                              : Colors.white,
                           width: 3,
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: CustomPaint(
                         painter: PlateGuidePainter(
-                          color: _plateDetected ? AppTheme.successGreen : Colors.white,
+                          color: _plateDetected
+                              ? AppTheme.successGreen
+                              : Colors.white,
                         ),
                       ),
                     ),
@@ -192,7 +249,10 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
                           Row(
                             children: [
                               IconButton(
-                                icon: const Icon(LucideIcons.x, color: Colors.white),
+                                icon: const Icon(
+                                  LucideIcons.x,
+                                  color: Colors.white,
+                                ),
                                 onPressed: () => Navigator.pop(context),
                               ),
                               const SizedBox(width: 8),
@@ -273,7 +333,10 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen> {
                               height: 70,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 4),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 4,
+                                ),
                               ),
                               child: _isProcessing
                                   ? const Padding(
@@ -318,22 +381,46 @@ class PlateGuidePainter extends CustomPainter {
 
     // Draw corner markers
     const cornerSize = 20.0;
-    
+
     // Top-left
     canvas.drawLine(Offset(0, 0), Offset(cornerSize, 0), paint);
     canvas.drawLine(Offset(0, 0), Offset(0, cornerSize), paint);
-    
+
     // Top-right
-    canvas.drawLine(Offset(size.width - cornerSize, 0), Offset(size.width, 0), paint);
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width, cornerSize), paint);
-    
+    canvas.drawLine(
+      Offset(size.width - cornerSize, 0),
+      Offset(size.width, 0),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width, 0),
+      Offset(size.width, cornerSize),
+      paint,
+    );
+
     // Bottom-left
-    canvas.drawLine(Offset(0, size.height - cornerSize), Offset(0, size.height), paint);
-    canvas.drawLine(Offset(0, size.height), Offset(cornerSize, size.height), paint);
-    
+    canvas.drawLine(
+      Offset(0, size.height - cornerSize),
+      Offset(0, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(cornerSize, size.height),
+      paint,
+    );
+
     // Bottom-right
-    canvas.drawLine(Offset(size.width - cornerSize, size.height), Offset(size.width, size.height), paint);
-    canvas.drawLine(Offset(size.width, size.height - cornerSize), Offset(size.width, size.height), paint);
+    canvas.drawLine(
+      Offset(size.width - cornerSize, size.height),
+      Offset(size.width, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width, size.height - cornerSize),
+      Offset(size.width, size.height),
+      paint,
+    );
   }
 
   @override

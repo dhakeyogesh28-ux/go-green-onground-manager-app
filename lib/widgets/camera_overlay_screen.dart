@@ -24,19 +24,23 @@ class CameraOverlayScreen extends StatefulWidget {
   State<CameraOverlayScreen> createState() => _CameraOverlayScreenState();
 }
 
-class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
+class _CameraOverlayScreenState extends State<CameraOverlayScreen>
+    with WidgetsBindingObserver {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
   bool _isInitialized = false;
   bool _isCapturing = false;
+  bool _isDisposing = false;
   FlashMode _flashMode = FlashMode.off;
 
   // Category-specific instructions
   Map<String, String> get _instructions => {
     'exterior_front': 'Align the front of the vehicle within the frame',
     'exterior_rear': 'Align the rear of the vehicle within the frame',
-    'exterior_left': 'Rotate your phone to landscape mode and capture the left side',
-    'exterior_right': 'Rotate your phone to landscape mode and capture the right side',
+    'exterior_left':
+        'Rotate your phone to landscape mode and capture the left side',
+    'exterior_right':
+        'Rotate your phone to landscape mode and capture the right side',
     'dents_scratches': 'Focus on any dents, scratches, or damage',
     'interior_cabin': 'Capture the interior cabin',
     'dikki_trunk': 'Capture the trunk/dikki interior',
@@ -54,21 +58,43 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
     'additional_photos': 'Capture any additional details',
   };
 
-  String get _instruction => _instructions[widget.categoryId] ?? 'Position the subject within the frame';
+  String get _instruction =>
+      _instructions[widget.categoryId] ??
+      'Position the subject within the frame';
 
   bool get _shouldShowVehicleOutline {
     return widget.categoryId.startsWith('exterior_');
   }
 
   bool get _isLandscapeCategory {
-    return widget.categoryId == 'exterior_left' || widget.categoryId == 'exterior_right';
+    return widget.categoryId == 'exterior_left' ||
+        widget.categoryId == 'exterior_right';
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _setOrientation();
     _initializeCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final CameraController? controller = _controller;
+
+    // App state changed before we got the controller
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      // Free up resources when app is inactive
+      _disposeCamera();
+    } else if (state == AppLifecycleState.resumed) {
+      // Reinitialize camera when app is resumed
+      _initializeCamera();
+    }
   }
 
   void _setOrientation() {
@@ -81,54 +107,85 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
   }
 
   Future<void> _initializeCamera() async {
+    if (_isDisposing) return;
+
     try {
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
         throw Exception('No cameras available');
       }
 
+      // Dispose previous controller if exists
+      await _disposeCamera();
+      if (!mounted || _isDisposing) return;
+
       _controller = CameraController(
         _cameras![0],
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _controller!.initialize();
-      
-      if (mounted) {
+
+      // Set flash mode after initialization
+      await _controller!.setFlashMode(_flashMode);
+
+      if (mounted && !_isDisposing) {
         setState(() {
           _isInitialized = true;
         });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Camera error: $e')),
-        );
+      debugPrint('Camera error: $e');
+      if (mounted && !_isDisposing) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Camera error: $e')));
         Navigator.pop(context);
       }
     }
   }
 
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    if (controller != null) {
+      _controller = null;
+      if (mounted) {
+        setState(() {
+          _isInitialized = false;
+        });
+      }
+      try {
+        await controller.dispose();
+      } catch (e) {
+        debugPrint('Error disposing camera: $e');
+      }
+    }
+  }
+
   Future<void> _capturePhoto() async {
-    if (_isCapturing || _controller == null || !_controller!.value.isInitialized) return;
-    
+    if (_isCapturing ||
+        _controller == null ||
+        !_controller!.value.isInitialized)
+      return;
+
     setState(() {
       _isCapturing = true;
     });
 
     try {
       final XFile photo = await _controller!.takePicture();
-      
+
       if (mounted) {
         widget.onPhotoTaken(photo.path);
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -144,20 +201,23 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
 
     try {
       setState(() {
-        _flashMode = _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
+        _flashMode = _flashMode == FlashMode.off
+            ? FlashMode.torch
+            : FlashMode.off;
       });
       await _controller!.setFlashMode(_flashMode);
     } catch (e) {
       // Flash not supported
+      debugPrint('Flash not supported: $e');
     }
   }
 
   @override
   void dispose() {
+    _isDisposing = true;
+    WidgetsBinding.instance.removeObserver(this);
     // Reset orientation to portrait when leaving
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _controller?.dispose();
     super.dispose();
   }
@@ -171,17 +231,19 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
           : Stack(
               children: [
                 // Live Camera Preview
-                Positioned.fill(
-                  child: CameraPreview(_controller!),
-                ),
+                Positioned.fill(child: CameraPreview(_controller!)),
 
                 // Vehicle Outline Overlay (if applicable)
                 if (_shouldShowVehicleOutline)
                   Positioned.fill(
                     child: Center(
                       child: SizedBox(
-                        width: MediaQuery.of(context).size.width * (_isLandscapeCategory ? 0.85 : 0.95),
-                        height: MediaQuery.of(context).size.width * (_isLandscapeCategory ? 0.5 : 0.8),
+                        width:
+                            MediaQuery.of(context).size.width *
+                            (_isLandscapeCategory ? 0.85 : 0.95),
+                        height:
+                            MediaQuery.of(context).size.width *
+                            (_isLandscapeCategory ? 0.5 : 0.8),
                         child: CustomPaint(
                           painter: VehicleOutlinePainter(
                             categoryId: widget.categoryId,
@@ -215,7 +277,10 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
                           Row(
                             children: [
                               IconButton(
-                                icon: const Icon(LucideIcons.x, color: Colors.white),
+                                icon: const Icon(
+                                  LucideIcons.x,
+                                  color: Colors.white,
+                                ),
                                 onPressed: () => Navigator.pop(context),
                               ),
                               const SizedBox(width: 8),
@@ -292,13 +357,15 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
                           // Flash toggle
                           IconButton(
                             icon: Icon(
-                              _flashMode == FlashMode.off ? LucideIcons.zap : LucideIcons.zapOff,
+                              _flashMode == FlashMode.off
+                                  ? LucideIcons.zap
+                                  : LucideIcons.zapOff,
                               color: Colors.white,
                               size: 28,
                             ),
                             onPressed: _toggleFlash,
                           ),
-                          
+
                           // Capture button
                           GestureDetector(
                             onTap: _isCapturing ? null : _capturePhoto,
@@ -307,7 +374,10 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
                               height: 70,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 4),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 4,
+                                ),
                               ),
                               child: _isCapturing
                                   ? const Padding(
@@ -326,7 +396,7 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen> {
                                     ),
                             ),
                           ),
-                          
+
                           // Placeholder for symmetry
                           const SizedBox(width: 48),
                         ],
@@ -355,7 +425,7 @@ class CornerMarkerPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final path = Path();
-    
+
     if (isTop && isLeft) {
       path.moveTo(size.width, 0);
       path.lineTo(0, 0);
@@ -401,7 +471,8 @@ class VehicleOutlinePainter extends CustomPainter {
       _drawFrontCar(canvas, size, paint, isPortrait);
     } else if (categoryId == 'exterior_rear') {
       _drawRearCar(canvas, size, paint, isPortrait);
-    } else if (categoryId == 'exterior_left' || categoryId == 'exterior_right') {
+    } else if (categoryId == 'exterior_left' ||
+        categoryId == 'exterior_right') {
       _drawSideCar(canvas, size, paint, isPortrait);
     }
   }
@@ -409,26 +480,51 @@ class VehicleOutlinePainter extends CustomPainter {
   void _drawFrontCar(Canvas canvas, Size size, Paint paint, bool isPortrait) {
     final w = size.width;
     final h = size.height;
-    
+
     // Optimized for mobile portrait - wider and centered vertically
     final centerY = h * 0.5;
     final carWidth = w * 0.75; // Wider for mobile
     final carHeight = h * 0.25; // Shorter for mobile
-    
+
     final path = Path();
-    
+
     // Roof & Windshield (Curvy)
     path.moveTo(w * 0.25, centerY - carHeight * 0.6);
-    path.quadraticBezierTo(w * 0.5, centerY - carHeight * 0.8, w * 0.75, centerY - carHeight * 0.6);
-    path.quadraticBezierTo(w * 0.85, centerY - carHeight * 0.2, w * 0.85, centerY);
+    path.quadraticBezierTo(
+      w * 0.5,
+      centerY - carHeight * 0.8,
+      w * 0.75,
+      centerY - carHeight * 0.6,
+    );
+    path.quadraticBezierTo(
+      w * 0.85,
+      centerY - carHeight * 0.2,
+      w * 0.85,
+      centerY,
+    );
     path.lineTo(w * 0.15, centerY);
-    path.quadraticBezierTo(w * 0.15, centerY - carHeight * 0.2, w * 0.25, centerY - carHeight * 0.6);
+    path.quadraticBezierTo(
+      w * 0.15,
+      centerY - carHeight * 0.2,
+      w * 0.25,
+      centerY - carHeight * 0.6,
+    );
 
     // Main Body/Grille Area
     path.moveTo(w * 0.1, centerY);
-    path.quadraticBezierTo(w * 0.1, centerY + carHeight * 0.8, w * 0.2, centerY + carHeight * 0.8);
+    path.quadraticBezierTo(
+      w * 0.1,
+      centerY + carHeight * 0.8,
+      w * 0.2,
+      centerY + carHeight * 0.8,
+    );
     path.lineTo(w * 0.8, centerY + carHeight * 0.8);
-    path.quadraticBezierTo(w * 0.9, centerY + carHeight * 0.8, w * 0.9, centerY);
+    path.quadraticBezierTo(
+      w * 0.9,
+      centerY + carHeight * 0.8,
+      w * 0.9,
+      centerY,
+    );
     path.close();
 
     canvas.drawPath(path, paint);
@@ -436,16 +532,36 @@ class VehicleOutlinePainter extends CustomPainter {
     // Stylish Headlights
     final leftLight = Path()
       ..moveTo(w * 0.15, centerY + carHeight * 0.2)
-      ..quadraticBezierTo(w * 0.25, centerY + carHeight * 0.1, w * 0.3, centerY + carHeight * 0.4)
-      ..quadraticBezierTo(w * 0.2, centerY + carHeight * 0.5, w * 0.15, centerY + carHeight * 0.2);
+      ..quadraticBezierTo(
+        w * 0.25,
+        centerY + carHeight * 0.1,
+        w * 0.3,
+        centerY + carHeight * 0.4,
+      )
+      ..quadraticBezierTo(
+        w * 0.2,
+        centerY + carHeight * 0.5,
+        w * 0.15,
+        centerY + carHeight * 0.2,
+      );
     canvas.drawPath(leftLight, paint);
 
     final rightLight = Path()
       ..moveTo(w * 0.85, centerY + carHeight * 0.2)
-      ..quadraticBezierTo(w * 0.75, centerY + carHeight * 0.1, w * 0.7, centerY + carHeight * 0.4)
-      ..quadraticBezierTo(w * 0.8, centerY + carHeight * 0.5, w * 0.85, centerY + carHeight * 0.2);
+      ..quadraticBezierTo(
+        w * 0.75,
+        centerY + carHeight * 0.1,
+        w * 0.7,
+        centerY + carHeight * 0.4,
+      )
+      ..quadraticBezierTo(
+        w * 0.8,
+        centerY + carHeight * 0.5,
+        w * 0.85,
+        centerY + carHeight * 0.2,
+      );
     canvas.drawPath(rightLight, paint);
-    
+
     // Modern Grille
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -463,26 +579,51 @@ class VehicleOutlinePainter extends CustomPainter {
   void _drawRearCar(Canvas canvas, Size size, Paint paint, bool isPortrait) {
     final w = size.width;
     final h = size.height;
-    
+
     // Optimized for mobile portrait
     final centerY = h * 0.5;
     final carWidth = w * 0.75;
     final carHeight = h * 0.25;
-    
+
     final path = Path();
 
     // Rear Roof & Window
     path.moveTo(w * 0.25, centerY - carHeight * 0.6);
-    path.quadraticBezierTo(w * 0.5, centerY - carHeight * 0.7, w * 0.75, centerY - carHeight * 0.6);
-    path.quadraticBezierTo(w * 0.85, centerY - carHeight * 0.2, w * 0.85, centerY);
+    path.quadraticBezierTo(
+      w * 0.5,
+      centerY - carHeight * 0.7,
+      w * 0.75,
+      centerY - carHeight * 0.6,
+    );
+    path.quadraticBezierTo(
+      w * 0.85,
+      centerY - carHeight * 0.2,
+      w * 0.85,
+      centerY,
+    );
     path.lineTo(w * 0.15, centerY);
-    path.quadraticBezierTo(w * 0.15, centerY - carHeight * 0.2, w * 0.25, centerY - carHeight * 0.6);
+    path.quadraticBezierTo(
+      w * 0.15,
+      centerY - carHeight * 0.2,
+      w * 0.25,
+      centerY - carHeight * 0.6,
+    );
 
     // Boot Area
     path.moveTo(w * 0.1, centerY);
-    path.quadraticBezierTo(w * 0.1, centerY + carHeight * 0.8, w * 0.2, centerY + carHeight * 0.8);
+    path.quadraticBezierTo(
+      w * 0.1,
+      centerY + carHeight * 0.8,
+      w * 0.2,
+      centerY + carHeight * 0.8,
+    );
     path.lineTo(w * 0.8, centerY + carHeight * 0.8);
-    path.quadraticBezierTo(w * 0.9, centerY + carHeight * 0.8, w * 0.9, centerY);
+    path.quadraticBezierTo(
+      w * 0.9,
+      centerY + carHeight * 0.8,
+      w * 0.9,
+      centerY,
+    );
     path.close();
 
     canvas.drawPath(path, paint);
@@ -490,19 +631,29 @@ class VehicleOutlinePainter extends CustomPainter {
     // Sleek Tail lights
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.12, centerY + carHeight * 0.15, w * 0.18, carHeight * 0.25),
+        Rect.fromLTWH(
+          w * 0.12,
+          centerY + carHeight * 0.15,
+          w * 0.18,
+          carHeight * 0.25,
+        ),
         const Radius.circular(4),
       ),
       paint,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.7, centerY + carHeight * 0.15, w * 0.18, carHeight * 0.25),
+        Rect.fromLTWH(
+          w * 0.7,
+          centerY + carHeight * 0.15,
+          w * 0.18,
+          carHeight * 0.25,
+        ),
         const Radius.circular(4),
       ),
       paint,
     );
-    
+
     // Number Plate Area
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -520,17 +671,22 @@ class VehicleOutlinePainter extends CustomPainter {
   void _drawSideCar(Canvas canvas, Size size, Paint paint, bool isPortrait) {
     final w = size.width;
     final h = size.height;
-    
+
     // Optimized for mobile portrait - horizontal car profile
     final centerY = h * 0.5;
     final carHeight = h * 0.3;
-    
+
     final path = Path();
 
     // Side profile optimized for mobile
     path.moveTo(w * 0.05, centerY + carHeight * 0.5);
     // Front bumper
-    path.quadraticBezierTo(w * 0.05, centerY + carHeight * 0.2, w * 0.12, centerY + carHeight * 0.1);
+    path.quadraticBezierTo(
+      w * 0.05,
+      centerY + carHeight * 0.2,
+      w * 0.12,
+      centerY + carHeight * 0.1,
+    );
     // Hood
     path.lineTo(w * 0.28, centerY + carHeight * 0.1);
     // Windshield
@@ -540,14 +696,27 @@ class VehicleOutlinePainter extends CustomPainter {
     // Rear windshield
     path.lineTo(w * 0.85, centerY + carHeight * 0.1);
     // Trunk
-    path.quadraticBezierTo(w * 0.95, centerY + carHeight * 0.1, w * 0.95, centerY + carHeight * 0.5);
+    path.quadraticBezierTo(
+      w * 0.95,
+      centerY + carHeight * 0.1,
+      w * 0.95,
+      centerY + carHeight * 0.5,
+    );
     // Rear bumper
     path.lineTo(w * 0.95, centerY + carHeight * 0.7);
     // Underbody with wheel arches
     path.lineTo(w * 0.85, centerY + carHeight * 0.7);
-    path.arcToPoint(Offset(w * 0.68, centerY + carHeight * 0.7), radius: const Radius.circular(35), clockwise: false);
+    path.arcToPoint(
+      Offset(w * 0.68, centerY + carHeight * 0.7),
+      radius: const Radius.circular(35),
+      clockwise: false,
+    );
     path.lineTo(w * 0.38, centerY + carHeight * 0.7);
-    path.arcToPoint(Offset(w * 0.21, centerY + carHeight * 0.7), radius: const Radius.circular(35), clockwise: false);
+    path.arcToPoint(
+      Offset(w * 0.21, centerY + carHeight * 0.7),
+      radius: const Radius.circular(35),
+      clockwise: false,
+    );
     path.lineTo(w * 0.05, centerY + carHeight * 0.7);
     path.close();
 
@@ -568,18 +737,28 @@ class VehicleOutlinePainter extends CustomPainter {
       Offset(w * 0.54, centerY + carHeight * 0.7),
       paint,
     );
-    
+
     // Door handles
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.4, centerY + carHeight * 0.35, w * 0.06, carHeight * 0.08),
+        Rect.fromLTWH(
+          w * 0.4,
+          centerY + carHeight * 0.35,
+          w * 0.06,
+          carHeight * 0.08,
+        ),
         const Radius.circular(2),
       ),
       paint,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.62, centerY + carHeight * 0.35, w * 0.06, carHeight * 0.08),
+        Rect.fromLTWH(
+          w * 0.62,
+          centerY + carHeight * 0.35,
+          w * 0.06,
+          carHeight * 0.08,
+        ),
         const Radius.circular(2),
       ),
       paint,

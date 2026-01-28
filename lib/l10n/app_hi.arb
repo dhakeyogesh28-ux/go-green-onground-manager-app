@@ -114,7 +114,6 @@
     }
   },
   "completeInspection": "निरीक्षण पूरा करें",
-  "videoCaptured": "वीडियो रिकॉर्ड किया गया",
   "videoCaptured": "वीडियो कैप्चर किया गया",
   "playbackAvailable": "सारांश में प्लेबैक उपलब्ध है",
   "close": "बंद करें",
@@ -145,8 +144,10 @@
   "horn": "हॉर्न",
   "wipers": "वाइपर",
   "interior": "आंतरिक",
+  "mechanical": "यांत्रिक",
   "dashboardDisplay": "डैशबोर्ड डिस्प्ले",
   "infotainment": "इन्फोटेनमेंट सिस्टम",
   "airConditioning": "एयर कंडीशनिंग",
-  "seatAdjustments": "सीट समायोजन"
+  "seatAdjustments": "सीट समायोजन",
+  "driversRemark": "ड्राइवर की टिप्पणी"
 }

@@ -401,7 +401,7 @@ class AppLocalizationsHi extends AppLocalizations {
   String get interior => 'आंतरिक';
 
   @override
-  String get mechanical => 'Mechanical';
+  String get mechanical => 'यांत्रिक';
 
   @override
   String get dashboardDisplay => 'डैशबोर्ड डिस्प्ले';
@@ -416,5 +416,5 @@ class AppLocalizationsHi extends AppLocalizations {
   String get seatAdjustments => 'सीट समायोजन';
 
   @override
-  String get driversRemark => 'Drivers Remark';
+  String get driversRemark => 'ड्राइवर की टिप्पणी';
 }

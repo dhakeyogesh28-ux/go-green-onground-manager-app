@@ -28,7 +28,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _odometerController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  
+
   Vehicle? _selectedVehicle;
   Driver? _selectedDriver;
   String? _ridePurpose; // 'B2B' or 'B2C'
@@ -42,59 +42,91 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
   // Inventory photo categories
   final List<Map<String, dynamic>> _photoCategories = [
-    {'id': 'exterior_front', 'label': 'Exterior: Front View', 'icon': LucideIcons.car},
-    {'id': 'exterior_rear', 'label': 'Exterior: Rear View', 'icon': LucideIcons.car},
-    {'id': 'exterior_left', 'label': 'Exterior: Left Side', 'icon': LucideIcons.car},
-    {'id': 'exterior_right', 'label': 'Exterior: Right Side', 'icon': LucideIcons.car},
+    {
+      'id': 'exterior_front',
+      'label': 'Exterior: Front View',
+      'icon': LucideIcons.car,
+    },
+    {
+      'id': 'exterior_rear',
+      'label': 'Exterior: Rear View',
+      'icon': LucideIcons.car,
+    },
+    {
+      'id': 'exterior_left',
+      'label': 'Exterior: Left Side',
+      'icon': LucideIcons.car,
+    },
+    {
+      'id': 'exterior_right',
+      'label': 'Exterior: Right Side',
+      'icon': LucideIcons.car,
+    },
     {'id': 'odometer', 'label': 'Odometer Photo', 'icon': LucideIcons.gauge},
     {'id': 'stepney_tyre', 'label': 'Stepney Tyre', 'icon': LucideIcons.disc},
     {'id': 'umbrella', 'label': 'Umbrella', 'icon': LucideIcons.umbrella},
     {'id': 'battery', 'label': 'Battery', 'icon': LucideIcons.battery},
-    {'id': 'engine_compartment', 'label': 'Engine Compartment', 'icon': LucideIcons.container},
-    {'id': 'corner_view_1', 'label': 'Corner View 1', 'icon': LucideIcons.maximize},
-    {'id': 'corner_view_2', 'label': 'Corner View 2', 'icon': LucideIcons.maximize},
-    {'id': 'corner_view_3', 'label': 'Corner View 3', 'icon': LucideIcons.maximize},
-    {'id': 'corner_view_4', 'label': 'Corner View 4', 'icon': LucideIcons.maximize},
-    {'id': 'dents_scratches', 'label': 'Dents & Scratches', 'icon': LucideIcons.scan},
-    {'id': 'interior_cabin', 'label': 'Interior / Cabin', 'icon': LucideIcons.armchair},
-    {'id': 'dikki_trunk', 'label': 'Dikki / Trunk', 'icon': LucideIcons.package},
+    {
+      'id': 'engine_compartment',
+      'label': 'Engine Compartment',
+      'icon': LucideIcons.container,
+    },
+    {
+      'id': 'corner_view_1',
+      'label': 'Corner View 1',
+      'icon': LucideIcons.maximize,
+    },
+    {
+      'id': 'corner_view_2',
+      'label': 'Corner View 2',
+      'icon': LucideIcons.maximize,
+    },
+    {
+      'id': 'corner_view_3',
+      'label': 'Corner View 3',
+      'icon': LucideIcons.maximize,
+    },
+    {
+      'id': 'corner_view_4',
+      'label': 'Corner View 4',
+      'icon': LucideIcons.maximize,
+    },
+    {
+      'id': 'dents_scratches',
+      'label': 'Dents & Scratches',
+      'icon': LucideIcons.scan,
+    },
+    {
+      'id': 'interior_cabin',
+      'label': 'Interior / Cabin',
+      'icon': LucideIcons.armchair,
+    },
+    {
+      'id': 'dikki_trunk',
+      'label': 'Dikki / Trunk',
+      'icon': LucideIcons.package,
+    },
     {'id': 'tool_kit', 'label': 'Tool Kit', 'icon': LucideIcons.wrench},
-    {'id': 'valuables_check', 'label': 'Valuables Check', 'icon': LucideIcons.briefcase},
+    {
+      'id': 'valuables_check',
+      'label': 'Valuables Check',
+      'icon': LucideIcons.briefcase,
+    },
   ];
 
   final List<String> _additionalPhotos = [];
 
   // EV-Specific Inspection sections
   final Map<String, List<Map<String, String>>> _inspectionSections = {
-    'Battery & Charging': [
-      {'id': 'battery_health', 'label': 'Battery Health & Charge Level'},
-      {'id': 'charging_port', 'label': 'Charging Port Condition'},
-      {'id': 'charging_cable', 'label': 'Charging Cable & Connector'},
-      {'id': 'battery_cooling', 'label': 'Battery Cooling System'},
+    'Exterior': [
+      {'id': 'wiper_water_spray', 'label': 'Wiper Water Spray'},
+      {'id': 'headlight', 'label': 'Headlight'},
+      {'id': 'taillight', 'label': 'Taillight'},
+      {'id': 'tyres', 'label': 'Tyres'},
+      {'id': 'stepney_tyre', 'label': 'Stepney Tyre'},
     ],
-    'Electric Motor & Drivetrain': [
-      {'id': 'motor_sound', 'label': 'Motor Sound & Performance'},
-      {'id': 'regenerative_braking', 'label': 'Regenerative Braking System'},
-      {'id': 'power_delivery', 'label': 'Power Delivery & Acceleration'},
-      {'id': 'drivetrain', 'label': 'Drivetrain Condition'},
-    ],
-    'Electrical Systems': [
-      {'id': 'dashboard_display', 'label': 'Dashboard & Digital Display'},
-      {'id': 'lights_indicators', 'label': 'Lights & Indicators'},
-      {'id': 'hvac_system', 'label': 'HVAC System (Heating/Cooling)'},
-      {'id': 'wiring_connections', 'label': 'Wiring & Connections'},
-    ],
-    'Exterior & Safety': [
-      {'id': 'body_panels', 'label': 'Body Panels & Paint'},
-      {'id': 'tires_pressure', 'label': 'Tires & Pressure'},
-      {'id': 'mirrors_wipers', 'label': 'Mirrors & Wipers'},
-      {'id': 'safety_features', 'label': 'Safety Features (Airbags, ABS)'},
-    ],
-    'Interior & Comfort': [
-      {'id': 'seats_upholstery', 'label': 'Seats & Upholstery'},
-      {'id': 'controls_switches', 'label': 'Controls & Switches'},
-      {'id': 'infotainment', 'label': 'Infotainment System'},
-      {'id': 'cabin_cleanliness', 'label': 'Cabin Cleanliness'},
+    'Interior': [
+      {'id': 'interior_clean', 'label': 'Clean'},
     ],
   };
 
@@ -122,18 +154,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
   Future<void> _launchPlateScanner() async {
     if (_hasLaunchedScanner) return;
-    
+
     setState(() {
       _hasLaunchedScanner = true;
     });
 
     final String? plateNumber = await Navigator.push<String>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const NumberPlateCameraScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const NumberPlateCameraScreen()),
     );
-    
+
     if (plateNumber != null && mounted) {
       // Set search text and search for vehicle
       _searchController.text = plateNumber;
@@ -144,26 +174,25 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   void _searchVehicle(String plateNumber) async {
     final appProvider = context.read<AppProvider>();
     final vehicles = appProvider.vehicles;
-    
+
     final foundVehicle = vehicles.firstWhere(
       (v) => v.vehicleNumber.toUpperCase() == plateNumber.toUpperCase(),
       orElse: () => vehicles.first, // Fallback
     );
-    
+
     if (foundVehicle.vehicleNumber.toUpperCase() == plateNumber.toUpperCase()) {
       setState(() {
         _selectedVehicle = foundVehicle;
         _isSearching = false;
-
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Vehicle ${foundVehicle.vehicleNumber} found!'),
           backgroundColor: AppTheme.successGreen,
         ),
       );
-      
+
       // Check for challans
       _checkChallans(plateNumber);
     } else {
@@ -186,7 +215,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       );
 
       final challanResponse = await ChallanService.checkChallans(vehicleNumber);
-      
+
       if (mounted && challanResponse.hasChallans) {
         _showChallanAlert(challanResponse);
       } else if (mounted) {
@@ -271,41 +300,46 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               ),
             ),
             if (response.challans.isNotEmpty) const SizedBox(height: 16),
-            if (response.challans.isNotEmpty) const Text(
-              'Challan Details:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            if (response.challans.isNotEmpty) const SizedBox(height: 8),
-            ...response.challans.take(3).map((challan) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      challan.violation,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '₹${challan.amount.toStringAsFixed(0)} • ${challan.date}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
+            if (response.challans.isNotEmpty)
+              const Text(
+                'Challan Details:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
-            )),
+            if (response.challans.isNotEmpty) const SizedBox(height: 8),
+            ...response.challans
+                .take(3)
+                .map(
+                  (challan) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            challan.violation,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₹${challan.amount.toStringAsFixed(0)} • ${challan.date}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
           ],
         ),
         actions: [
@@ -329,15 +363,18 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     if (_searchController.text.isEmpty) {
       return allVehicles;
     }
-    
+
     final query = _searchController.text.toLowerCase();
     return allVehicles.where((vehicle) {
       return vehicle.vehicleNumber.toLowerCase().contains(query) ||
-             vehicle.customerName.toLowerCase().contains(query);
+          vehicle.customerName.toLowerCase().contains(query);
     }).toList();
   }
 
-  Future<void> _capturePhoto(String categoryId, {bool autoAdvance = true}) async {
+  Future<void> _capturePhoto(
+    String categoryId, {
+    bool autoAdvance = true,
+  }) async {
     // Find the category to get its label
     final category = _photoCategories.firstWhere(
       (cat) => cat['id'] == categoryId,
@@ -360,7 +397,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   _inventoryPhotos[categoryId] = photoPath;
                 }
               });
-              
+
               // Show success message
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -370,7 +407,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   ),
                 );
               }
-              
+
               // Auto-advance to next uncaptured photo (only for required photos)
               if (autoAdvance && mounted) {
                 _autoAdvanceToNextPhoto(categoryId);
@@ -381,9 +418,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -393,19 +430,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     final currentIndex = _photoCategories.indexWhere(
       (cat) => cat['id'] == currentCategoryId,
     );
-    
+
     if (currentIndex == -1) return;
-    
+
     // Find the next uncaptured required photo
     for (int i = currentIndex + 1; i < _photoCategories.length; i++) {
       final nextCategory = _photoCategories[i];
       final categoryId = nextCategory['id'] as String;
       final isOptional = nextCategory['isOptional'] == true;
       final isCaptured = _inventoryPhotos[categoryId] != null;
-      
+
       // Skip if already captured
       if (isCaptured) continue;
-      
+
       // For required photos, auto-advance immediately
       // For optional photos, don't auto-advance (let user choose)
       if (!isOptional) {
@@ -418,7 +455,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         return;
       }
     }
-    
+
     // If we reach here, all required photos are captured
     // Check if there are any optional photos left
     final hasUncapturedOptional = _photoCategories.any((cat) {
@@ -427,12 +464,14 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       final isCaptured = _inventoryPhotos[id] != null;
       return isOptional && !isCaptured;
     });
-    
+
     if (hasUncapturedOptional && mounted) {
       // Show message that required photos are done
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('All required photos captured! You can add optional photos if needed.'),
+          content: Text(
+            'All required photos captured! You can add optional photos if needed.',
+          ),
           duration: Duration(seconds: 2),
         ),
       );
@@ -441,9 +480,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
   void _navigateToAddIssue() async {
     if (_selectedVehicle == null) return;
-    
+
     final result = await context.push('/add-issue/${_selectedVehicle!.id}');
-    
+
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
         _reportedIssues.add({
@@ -454,30 +493,25 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     }
   }
 
-
-
   Future<void> _handleCheckOut() async {
     if (_selectedVehicle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a vehicle')));
       return;
     }
 
-
-
-
     final provider = context.read<AppProvider>();
-    
-    try {
-      debugPrint('🚗 Starting check-out process for ${_selectedVehicle!.vehicleNumber}');
-      
 
-      
+    try {
+      debugPrint(
+        '🚗 Starting check-out process for ${_selectedVehicle!.vehicleNumber}',
+      );
+
       // 2. Save inspection checklist to database
       final Map<String, dynamic> cleanedChecklist = {};
       final List<String> issueItems = []; // Track items marked as Issue
-      
+
       _inspectionChecklist.forEach((key, value) {
         if (value != null) {
           cleanedChecklist[key] = value;
@@ -500,28 +534,38 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           }
         }
       });
-      
+
       // 3. Create maintenance jobs for items marked as "Issue"
       if (issueItems.isNotEmpty) {
-        debugPrint('⚠️ Creating maintenance jobs for ${issueItems.length} issues...');
-        
+        debugPrint(
+          '⚠️ Creating maintenance jobs for ${issueItems.length} issues...',
+        );
+
         for (var issueLabel in issueItems) {
           try {
-            await provider.addIssue(ReportedIssue(
-              id: DateTime.now().millisecondsSinceEpoch.toString() + '_' + issueLabel.hashCode.toString(),
-              vehicleId: _selectedVehicle!.id,
-              type: 'Inspection Issue',
-              description: 'Issue detected during check-out inspection: $issueLabel',
-              timestamp: DateTime.now(),
-            ));
-            
+            await provider.addIssue(
+              ReportedIssue(
+                id:
+                    DateTime.now().millisecondsSinceEpoch.toString() +
+                    '_' +
+                    issueLabel.hashCode.toString(),
+                vehicleId: _selectedVehicle!.id,
+                type: 'Inspection Issue',
+                description:
+                    'Issue detected during check-out inspection: $issueLabel',
+                timestamp: DateTime.now(),
+              ),
+            );
+
             debugPrint('✅ Created maintenance job for: $issueLabel');
           } catch (e) {
-            debugPrint('Warning: Could not create maintenance job for $issueLabel: $e');
+            debugPrint(
+              'Warning: Could not create maintenance job for $issueLabel: $e',
+            );
             // Continue with other issues even if one fails
           }
         }
-        
+
         // Show notification to user about issues reported
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -533,7 +577,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           );
         }
       }
-      
+
       // 4. Save inventory photos to Supabase Storage and database
       debugPrint('📸 Saving ${_inventoryPhotos.length} inventory photos...');
       for (var entry in _inventoryPhotos.entries) {
@@ -563,10 +607,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           debugPrint('Warning: Could not save additional photo $i: $e');
         }
       }
-      
+
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
-      
+
       // Store odometer within daily_checks map to avoid missing column error
       cleanedChecklist['odometer_reading'] = _odometerController.text.trim();
       cleanedChecklist['ride_purpose'] = _ridePurpose;
@@ -574,16 +618,22 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       try {
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
           'is_vehicle_in': false,
-          'status': issueItems.isNotEmpty ? 'maintenance' : 'active', // Set to maintenance if issues found
+          'status': issueItems.isNotEmpty
+              ? 'maintenance'
+              : 'active', // Set to maintenance if issues found
           'battery_level': _batteryPercentage.round(),
           'last_charge_type': 'AC',
           'last_charging_type': 'AC',
           'battery_health': _batteryPercentage.round(),
           'daily_checks': cleanedChecklist,
           'last_inventory_time': DateTime.now().toIso8601String(),
-          'last_inspection_date': DateTime.now().toIso8601String().split('T')[0],
-          'service_attention': issueItems.isNotEmpty, // Flag for attention if issues found
-          'last_check_out_time': DateTime.now().toIso8601String(), // Track check-out time
+          'last_inspection_date': DateTime.now().toIso8601String().split(
+            'T',
+          )[0],
+          'service_attention':
+              issueItems.isNotEmpty, // Flag for attention if issues found
+          'last_check_out_time': DateTime.now()
+              .toIso8601String(), // Track check-out time
         });
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {
@@ -599,7 +649,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         }
         rethrow; // Stop the process if data save fails
       }
-      
+
       // 6. Mark driver attendance if driver is selected
       if (_selectedDriver != null) {
         try {
@@ -620,56 +670,66 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           // Continue with check-out even if attendance marking fails
         }
       }
-      
+
       // 7. Log activity - ensure vehicleNumber is not null/empty
       final vehicleNumber = _selectedVehicle!.vehicleNumber;
       if (vehicleNumber.isEmpty) {
-        throw Exception('Cannot log activity: vehicle number is empty for vehicle ${_selectedVehicle!.id}');
+        throw Exception(
+          'Cannot log activity: vehicle number is empty for vehicle ${_selectedVehicle!.id}',
+        );
       }
-      
+
       try {
-        await provider.logActivity(Activity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          vehicleId: _selectedVehicle!.id,
-          vehicleNumber: vehicleNumber,
-          activityType: 'check_out',
-          userName: provider.userName ?? provider.userEmail ?? 'Unknown',
-          timestamp: DateTime.now(),
-          metadata: {
-            'battery_percentage': _batteryPercentage.round(),
-            'charging_type': 'AC',
-            'inspection_items_checked': cleanedChecklist.length,
-            'photos_captured': _inventoryPhotos.values.where((v) => v != null).length + _additionalPhotos.length,
-            'additional_photos_count': _additionalPhotos.length,
-            'issues_reported': issueItems.length,
-            'issue_details': issueItems,
-            'odometer_reading': _odometerController.text.trim(),
-            'ride_purpose': _ridePurpose,
-            if (_selectedDriver != null) 'driver_id': _selectedDriver!.id,
-            if (_selectedDriver != null) 'driver_name': _selectedDriver!.name,
-          },
-        ));
+        await provider.logActivity(
+          Activity(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            vehicleId: _selectedVehicle!.id,
+            vehicleNumber: vehicleNumber,
+            activityType: 'check_out',
+            userName: provider.userName ?? provider.userEmail ?? 'Unknown',
+            timestamp: DateTime.now(),
+            metadata: {
+              'battery_percentage': _batteryPercentage.round(),
+              'charging_type': 'AC',
+              'inspection_items_checked': cleanedChecklist.length,
+              'photos_captured':
+                  _inventoryPhotos.values.where((v) => v != null).length +
+                  _additionalPhotos.length,
+              'additional_photos_count': _additionalPhotos.length,
+              'issues_reported': issueItems.length,
+              'issue_details': issueItems,
+              'odometer_reading': _odometerController.text.trim(),
+              'ride_purpose': _ridePurpose,
+              if (_selectedDriver != null) 'driver_id': _selectedDriver!.id,
+              if (_selectedDriver != null) 'driver_name': _selectedDriver!.name,
+            },
+          ),
+        );
         debugPrint('✅ Activity logged successfully');
       } catch (e) {
         debugPrint('⚠️ Warning: Could not log activity: $e');
         // Don't fail the entire check-out if activity logging fails
         // The vehicle data is already saved
       }
-      
+
       // 8. Refresh vehicles and activities to get updated data from database
       debugPrint('🔄 Refreshing vehicles and activities from database...');
       await provider.loadVehicles(forceRefresh: true);
       await provider.loadActivities(limit: 20); // Load recent activities
-      
-      debugPrint('✅ Check-out completed successfully - all data saved and verified');
+
+      debugPrint(
+        '✅ Check-out completed successfully - all data saved and verified',
+      );
       if (issueItems.isNotEmpty) {
         debugPrint('⚠️ Admin notified about ${issueItems.length} issue(s)');
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_selectedVehicle!.vehicleNumber} checked out successfully'),
+            content: Text(
+              '${_selectedVehicle!.vehicleNumber} checked out successfully',
+            ),
             backgroundColor: AppTheme.successGreen,
           ),
         );
@@ -700,12 +760,18 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(LucideIcons.x, color: Theme.of(context).textTheme.bodyLarge?.color),
+          icon: Icon(
+            LucideIcons.x,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
           onPressed: () => context.pop(),
         ),
         title: Text(
           'Check Out Vehicle',
-          style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Theme.of(context).textTheme.titleLarge?.color,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: Column(
@@ -719,35 +785,46 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   // Search Vehicle
                   _buildSectionTitle('Search Vehicle'),
                   const SizedBox(height: 12),
-                    TextField(
-                      controller: _searchController,
-                      onChanged: (value) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Search by vehicle name or license plate...',
-                        hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
-                        prefixIcon: const Icon(LucideIcons.search, color: Color(0xFF9CA3AF)),
-                        filled: true,
-                        fillColor: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.white.withOpacity(0.05) 
-                            : const Color(0xFFF9FAFB),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search by vehicle name or license plate...',
+                      hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                      prefixIcon: const Icon(
+                        LucideIcons.search,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withOpacity(0.05)
+                          : const Color(0xFFF9FAFB),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppTheme.primaryBlue),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryBlue,
                         ),
                       ),
                     ),
-                  
+                  ),
+
                   if (_isSearching && _selectedVehicle == null) ...[
                     const SizedBox(height: 16),
-                    ...filteredVehicles.map((vehicle) => _buildVehicleCard(vehicle)),
+                    ...filteredVehicles.map(
+                      (vehicle) => _buildVehicleCard(vehicle),
+                    ),
                   ],
 
                   if (_selectedVehicle != null) ...[
@@ -767,18 +844,24 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         hintText: 'Enter current odometer reading...',
-                        prefixIcon: const Icon(LucideIcons.gauge, color: Color(0xFF9CA3AF)),
+                        prefixIcon: const Icon(
+                          LucideIcons.gauge,
+                          color: Color(0xFF9CA3AF),
+                        ),
                         filled: true,
-                        fillColor: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.white.withOpacity(0.05) 
+                        fillColor:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(0.05)
                             : const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerColor,
+                          ),
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
                     DriverAssignmentSection(
                       title: 'Assign Driver',
@@ -790,22 +873,20 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         });
                       },
                     ),
-                    
+
                     const SizedBox(height: 24),
                     _buildRequiredInventoryPhotosSection(),
-                    
+
                     const SizedBox(height: 24),
                     _buildSectionTitle('Inspection Checklist'),
                     const SizedBox(height: 12),
                     _buildStaticInspectionChecklist(),
-                    
+
                     const SizedBox(height: 24),
                     _buildSectionTitle('Battery Level'),
                     const SizedBox(height: 12),
                     _buildBatteryPercentageSlider(),
-                    
 
-                    
                     const SizedBox(height: 24),
                     _buildAddIssueButton(),
                   ],
@@ -813,7 +894,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               ),
             ),
           ),
-          
+
           if (_selectedVehicle != null) _buildBottomActions(),
         ],
       ),
@@ -869,13 +950,22 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 children: [
                   Text(
                     vehicle.vehicleNumber,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    vehicle.make ?? vehicle.model ?? vehicle.customerName ?? 'Unknown',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                    vehicle.make ??
+                        vehicle.model ??
+                        vehicle.customerName ??
+                        'Unknown',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -906,12 +996,18 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               children: [
                 Text(
                   _selectedVehicle!.vehicleNumber,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   _selectedVehicle!.customerName,
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -944,7 +1040,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           final items = entry.value;
           final isFirstSection = sectionTitle == _inspectionSections.keys.first;
           final isLastSection = sectionTitle == _inspectionSections.keys.last;
-          
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -953,8 +1049,12 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryGreen.withOpacity(0.05),
                   borderRadius: BorderRadius.only(
-                    topLeft: isFirstSection ? const Radius.circular(12) : Radius.zero,
-                    topRight: isFirstSection ? const Radius.circular(12) : Radius.zero,
+                    topLeft: isFirstSection
+                        ? const Radius.circular(12)
+                        : Radius.zero,
+                    topRight: isFirstSection
+                        ? const Radius.circular(12)
+                        : Radius.zero,
                   ),
                 ),
                 child: Row(
@@ -980,13 +1080,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 final id = item['id']!;
                 final label = item['label']!;
                 final value = _inspectionChecklist[id];
-                
+
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: value == null 
-                      ? Colors.white 
-                      : value 
+                    color: value == null
+                        ? Colors.white
+                        : value
                         ? AppTheme.successGreen.withOpacity(0.05)
                         : AppTheme.dangerRed.withOpacity(0.05),
                     border: Border(
@@ -1014,7 +1117,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         color: AppTheme.successGreen,
                         onTap: () {
                           setState(() {
-                            _inspectionChecklist[id] = value == true ? null : true;
+                            _inspectionChecklist[id] = value == true
+                                ? null
+                                : true;
                           });
                         },
                       ),
@@ -1027,7 +1132,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         color: AppTheme.dangerRed,
                         onTap: () {
                           setState(() {
-                            _inspectionChecklist[id] = value == false ? null : false;
+                            _inspectionChecklist[id] = value == false
+                                ? null
+                                : false;
                           });
                         },
                       ),
@@ -1035,8 +1142,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   ),
                 );
               }),
-              if (!isLastSection)
-                const Divider(height: 1),
+              if (!isLastSection) const Divider(height: 1),
             ],
           );
         }).toList(),
@@ -1067,11 +1173,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? Colors.white : color,
-            ),
+            Icon(icon, size: 14, color: isSelected ? Colors.white : color),
             const SizedBox(width: 4),
             Text(
               label,
@@ -1110,7 +1212,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -1152,17 +1257,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             children: [
               Text(
                 '0%',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               Text(
                 '100%',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -1171,25 +1270,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     );
   }
 
-
-
   Widget _buildRidePurposeSection() {
     return Row(
       children: [
-        Expanded(
-          child: _buildPurposeButton('B2B', LucideIcons.briefcase),
-        ),
+        Expanded(child: _buildPurposeButton('B2B', LucideIcons.briefcase)),
         const SizedBox(width: 12),
-        Expanded(
-          child: _buildPurposeButton('B2C', LucideIcons.user),
-        ),
+        Expanded(child: _buildPurposeButton('B2C', LucideIcons.user)),
       ],
     );
   }
 
   Widget _buildPurposeButton(String purpose, IconData icon) {
     final isSelected = _ridePurpose == purpose;
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -1199,7 +1292,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryBlue.withOpacity(0.1) : Colors.white,
+          color: isSelected
+              ? AppTheme.primaryBlue.withOpacity(0.1)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppTheme.primaryBlue : const Color(0xFFE5E7EB),
@@ -1210,7 +1305,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppTheme.primaryBlue : const Color(0xFF6B7280),
+              color: isSelected
+                  ? AppTheme.primaryBlue
+                  : const Color(0xFF6B7280),
               size: 24,
             ),
             const SizedBox(height: 8),
@@ -1218,7 +1315,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               purpose,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isSelected ? AppTheme.primaryBlue : const Color(0xFF374151),
+                color: isSelected
+                    ? AppTheme.primaryBlue
+                    : const Color(0xFF374151),
               ),
             ),
           ],
@@ -1243,15 +1342,12 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         final photoPath = _inventoryPhotos[category['id']];
         final isCaptured = photoPath != null;
         final isOptional = category['isOptional'] == true;
-        
+
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFE5E7EB),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
@@ -1266,35 +1362,37 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     // Show captured image or placeholder icon
                     if (isCaptured && photoPath != null)
                       ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
                         child: kIsWeb
-                          ? Image.network(photoPath, fit: BoxFit.cover)
-                          : Image.file(
-                              File(photoPath),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey.shade200,
-                                  child: Icon(
-                                    category['icon'] as IconData,
-                                    color: Colors.grey.shade400,
-                                    size: 32,
-                                  ),
-                                );
-                              },
-                            ),
+                            ? Image.network(photoPath, fit: BoxFit.cover)
+                            : Image.file(
+                                File(photoPath),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey.shade200,
+                                    child: Icon(
+                                      category['icon'] as IconData,
+                                      color: Colors.grey.shade400,
+                                      size: 32,
+                                    ),
+                                  );
+                                },
+                              ),
                       )
                     else
                       Container(
                         color: isOptional
-                          ? Colors.orange.withOpacity(0.05)
-                          : const Color(0xFFF3F4F6),
+                            ? Colors.orange.withOpacity(0.05)
+                            : const Color(0xFFF3F4F6),
                         child: Center(
                           child: Icon(
                             category['icon'] as IconData,
                             color: isOptional
-                              ? Colors.orange.withOpacity(0.5)
-                              : const Color(0xFF9CA3AF),
+                                ? Colors.orange.withOpacity(0.5)
+                                : const Color(0xFF9CA3AF),
                             size: 32,
                           ),
                         ),
@@ -1329,7 +1427,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: isCaptured ? AppTheme.successGreen : const Color(0xFF111827),
+                    color: isCaptured
+                        ? AppTheme.successGreen
+                        : const Color(0xFF111827),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -1338,7 +1438,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               // Action buttons
               if (isCaptured)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: Row(
                     children: [
                       // Delete button
@@ -1373,7 +1476,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                       // Recapture button
                       Expanded(
                         child: InkWell(
-                          onTap: () => _capturePhoto(category['id']!, autoAdvance: false),
+                          onTap: () => _capturePhoto(
+                            category['id']!,
+                            autoAdvance: false,
+                          ),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             decoration: BoxDecoration(
@@ -1393,15 +1499,18 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () => _capturePhoto(category['id']!),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isOptional
-                          ? Colors.orange.withOpacity(0.1)
-                          : const Color(0xFFEFF6FF),
+                            ? Colors.orange.withOpacity(0.1)
+                            : const Color(0xFFEFF6FF),
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         shape: RoundedRectangleBorder(
@@ -1412,8 +1521,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         isOptional ? 'Add Photo' : 'Capture',
                         style: TextStyle(
                           color: isOptional
-                            ? Colors.orange
-                            : AppTheme.primaryBlue,
+                              ? Colors.orange
+                              : AppTheme.primaryBlue,
                           fontWeight: FontWeight.w600,
                           fontSize: 10,
                         ),
@@ -1431,50 +1540,59 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   Widget _buildIssuesSection() {
     return Column(
       children: [
-        ..._reportedIssues.map((issue) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.dangerRed.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(LucideIcons.alertCircle, color: AppTheme.dangerRed, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      issue['type']!,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppTheme.dangerRed,
-                      ),
-                    ),
-                    Text(
-                      issue['description']!,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                    ),
-                  ],
+        ..._reportedIssues.map(
+          (issue) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.dangerRed.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  LucideIcons.alertCircle,
+                  color: AppTheme.dangerRed,
+                  size: 20,
                 ),
-              ),
-              IconButton(
-                icon: const Icon(LucideIcons.x, size: 16),
-                onPressed: () {
-                  setState(() {
-                    _reportedIssues.remove(issue);
-                  });
-                },
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        issue['type']!,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppTheme.dangerRed,
+                        ),
+                      ),
+                      Text(
+                        issue['description']!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x, size: 16),
+                  onPressed: () {
+                    setState(() {
+                      _reportedIssues.remove(issue);
+                    });
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
         OutlinedButton.icon(
           onPressed: _navigateToAddIssue,
           icon: const Icon(LucideIcons.plus, size: 16),
@@ -1482,7 +1600,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(double.infinity, 44),
             side: const BorderSide(color: Color(0xFFE5E7EB)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ],
@@ -1490,18 +1610,24 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   }
 
   Widget _buildRequiredInventoryPhotosSection() {
-    final requiredPhotos = _photoCategories.where((cat) => cat['isOptional'] != true).toList();
-    final photoCapturedCount = requiredPhotos.where((cat) => _inventoryPhotos[cat['id']] != null).length;
+    final requiredPhotos = _photoCategories
+        .where((cat) => cat['isOptional'] != true)
+        .toList();
+    final photoCapturedCount = requiredPhotos
+        .where((cat) => _inventoryPhotos[cat['id']] != null)
+        .length;
     final totalPhotos = requiredPhotos.length;
     final allPhotosCaptured = photoCapturedCount == totalPhotos;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: allPhotosCaptured ? AppTheme.successGreen : Colors.orange.shade200,
+          color: allPhotosCaptured
+              ? AppTheme.successGreen
+              : Colors.orange.shade200,
           width: 1.5,
         ),
       ),
@@ -1514,12 +1640,20 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (allPhotosCaptured ? AppTheme.successGreen : Colors.orange).withOpacity(0.1),
+                  color:
+                      (allPhotosCaptured
+                              ? AppTheme.successGreen
+                              : Colors.orange)
+                          .withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  allPhotosCaptured ? LucideIcons.checkCheck : LucideIcons.camera,
-                  color: allPhotosCaptured ? AppTheme.successGreen : Colors.orange,
+                  allPhotosCaptured
+                      ? LucideIcons.checkCheck
+                      : LucideIcons.camera,
+                  color: allPhotosCaptured
+                      ? AppTheme.successGreen
+                      : Colors.orange,
                   size: 20,
                 ),
               ),
@@ -1536,11 +1670,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                       ),
                     ),
                     Text(
-                      allPhotosCaptured ? 'All required photos captured' : 'Capture all angles & details',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
+                      allPhotosCaptured
+                          ? 'All required photos captured'
+                          : 'Capture all angles & details',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -1549,7 +1682,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 '$photoCapturedCount/$totalPhotos',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: allPhotosCaptured ? AppTheme.successGreen : Colors.orange,
+                  color: allPhotosCaptured
+                      ? AppTheme.successGreen
+                      : Colors.orange,
                   fontSize: 16,
                 ),
               ),
@@ -1558,7 +1693,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           const SizedBox(height: 16),
           // Photo Grid
           _buildInventoryPhotos(),
-          
+
           // Additional Photos Section (Nested)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
@@ -1576,7 +1711,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.image, color: AppTheme.primaryBlue, size: 18),
+            const Icon(
+              LucideIcons.image,
+              color: AppTheme.primaryBlue,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
@@ -1587,7 +1726,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             if (_additionalPhotos.isNotEmpty)
               Text(
                 '${_additionalPhotos.length}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryBlue,
+                  fontSize: 14,
+                ),
               ),
           ],
         ),
@@ -1618,20 +1761,34 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         fit: StackFit.expand,
                         children: [
                           ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(10),
+                            ),
                             child: kIsWeb
                                 ? Image.network(photoPath, fit: BoxFit.cover)
-                                : Image.file(File(photoPath), fit: BoxFit.cover),
+                                : Image.file(
+                                    File(photoPath),
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                           Positioned(
                             top: 4,
                             right: 4,
                             child: InkWell(
-                              onTap: () => setState(() => _additionalPhotos.removeAt(index)),
+                              onTap: () => setState(
+                                () => _additionalPhotos.removeAt(index),
+                              ),
                               child: Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                child: const Icon(LucideIcons.x, color: Colors.white, size: 10),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  LucideIcons.x,
+                                  color: Colors.white,
+                                  size: 10,
+                                ),
                               ),
                             ),
                           ),
@@ -1642,7 +1799,10 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                       padding: EdgeInsets.symmetric(vertical: 4),
                       child: Text(
                         'Additional',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -1660,7 +1820,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             label: const Text('Add Additional Photo'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.5)),
               foregroundColor: AppTheme.primaryBlue,
               backgroundColor: AppTheme.primaryBlue.withOpacity(0.05),
@@ -1694,7 +1856,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     color: AppTheme.dangerRed,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(LucideIcons.alertCircle, color: Colors.white, size: 16),
+                  child: const Icon(
+                    LucideIcons.alertCircle,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 const Text(
@@ -1712,8 +1878,6 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       ),
     );
   }
-
-
 
   Widget _buildBottomActions() {
     return Container(
@@ -1736,11 +1900,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 side: const BorderSide(color: Color(0xFFE5E7EB)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Color(0xFF374151),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -1752,7 +1921,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 0,
               ),
               child: const Text(

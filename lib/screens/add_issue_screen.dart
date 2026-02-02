@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -301,21 +302,78 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               child: ElevatedButton(
                 onPressed: (_typeController.text.isNotEmpty && _descController.text.isNotEmpty)
                     ? () async {
-                        await context.read<AppProvider>().addIssue(ReportedIssue(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              vehicleId: widget.vehicleId,
-                              type: _typeController.text,
-                              description: _descController.text,
-                              timestamp: DateTime.now(),
-                              photoPath: _capturedPhotoPath,
-                              videoPath: _capturedVideoPath,
-                            ));
-                        await _clearDraft();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Issue reported successfully')),
-                        );
-                        debugPrint('AddIssueScreen: [REPORT] Back to details...');
-                        Navigator.of(context).pop();
+                        try {
+                          // Show loading indicator
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    SizedBox(width: 16),
+                                    Text('Uploading issue...'),
+                                  ],
+                                ),
+                                duration: Duration(seconds: 60),
+                              ),
+                            );
+                          }
+
+                          await context.read<AppProvider>().addIssue(ReportedIssue(
+                                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                vehicleId: widget.vehicleId,
+                                type: _typeController.text,
+                                description: _descController.text,
+                                timestamp: DateTime.now(),
+                                photoPath: _capturedPhotoPath,
+                                videoPath: _capturedVideoPath,
+                              ));
+                          
+                          await _clearDraft();
+                          
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).clearSnackBars();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Issue reported successfully'),
+                                backgroundColor: AppTheme.successGreen,
+                              ),
+                            );
+                            debugPrint('AddIssueScreen: [REPORT] Back to details...');
+                            Navigator.of(context).pop({
+                              'type': _typeController.text,
+                              'description': _descController.text,
+                              'photoPath': _capturedPhotoPath,
+                              'videoPath': _capturedVideoPath,
+                            });
+                          }
+                        } catch (e) {
+                          debugPrint('AddIssueScreen: [ERROR] Failed to report issue: $e');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).clearSnackBars();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to report issue: ${e.toString().replaceAll('Exception: ', '')}'),
+                                backgroundColor: AppTheme.dangerRed,
+                                duration: const Duration(seconds: 5),
+                                action: SnackBarAction(
+                                  label: 'Retry',
+                                  textColor: Colors.white,
+                                  onPressed: () {
+                                    // Trigger button press again
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        }
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -421,7 +479,9 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                     color: Colors.black12,
                     child: const Icon(LucideIcons.video, color: Colors.grey),
                   )
-                : Image.file(file, fit: BoxFit.cover),
+                : kIsWeb
+                    ? Image.network(file.path, fit: BoxFit.cover)
+                    : Image.file(file, fit: BoxFit.cover),
           ),
           Positioned(
             top: 4,

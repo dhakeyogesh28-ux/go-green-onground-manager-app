@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:camera/camera.dart';
+import 'package:image/image.dart' as img;
 import 'package:mobile/models/vehicle.dart';
 import 'package:mobile/models/activity.dart';
 import 'package:mobile/models/driver.dart';
@@ -181,11 +182,6 @@ class AppProvider with ChangeNotifier {
              // User explicitly asked for MH 14 for Nashik, adding MH 15 for safety as it's the standard code
              return num.startsWith('MH14') || num.startsWith('MH15'); 
            }).toList();
-        } else if (hubName.contains('pune')) {
-           filteredVehicles = loadedVehicles.where((v) {
-             final num = v.vehicleNumber.replaceAll(' ', '').toUpperCase();
-             return num.startsWith('MH12');
-           }).toList();
         }
       }
 
@@ -305,12 +301,19 @@ class AppProvider with ChangeNotifier {
   /// Log a new activity (check-in/check-out)
   Future<void> logActivity(Activity activity) async {
     try {
+      // Add hub info to metadata if available and not already present
+      final updatedMetadata = Map<String, dynamic>.from(activity.metadata ?? {});
+      if (updatedMetadata['hub_name'] == null && _selectedHub != null) {
+        updatedMetadata['hub_name'] = _selectedHub;
+        debugPrint('AppProvider: Injected hub_name into activity: $_selectedHub');
+      }
+
       // Validate that vehicleNumber is not null or empty
       if (activity.vehicleNumber.isEmpty) {
         // Try to get vehicle number from the vehicle list
         final vehicle = getVehicleById(activity.vehicleId);
         if (vehicle != null && vehicle.vehicleNumber.isNotEmpty) {
-          // Recreate activity with correct vehicle number
+          // Recreate activity with correct vehicle number and updated metadata
           final correctedActivity = Activity(
             id: activity.id,
             vehicleId: activity.vehicleId,
@@ -318,7 +321,7 @@ class AppProvider with ChangeNotifier {
             activityType: activity.activityType,
             userName: activity.userName,
             timestamp: activity.timestamp,
-            metadata: activity.metadata,
+            metadata: updatedMetadata,
           );
           await _supabaseService.createActivity(correctedActivity.toJson());
           debugPrint('AppProvider: Activity logged: ${correctedActivity.activityType} for ${correctedActivity.vehicleNumber}');
@@ -327,9 +330,19 @@ class AppProvider with ChangeNotifier {
           throw Exception('Cannot log activity: vehicle_number is required but vehicle ${activity.vehicleId} not found or has no vehicle number');
         }
       } else {
-        await _supabaseService.createActivity(activity.toJson());
+        // Create a new activity object with updated metadata to ensure it's saved correctly
+        final finalActivity = Activity(
+          id: activity.id,
+          vehicleId: activity.vehicleId,
+          vehicleNumber: activity.vehicleNumber,
+          activityType: activity.activityType,
+          userName: activity.userName,
+          timestamp: activity.timestamp,
+          metadata: updatedMetadata,
+        );
+        await _supabaseService.createActivity(finalActivity.toJson());
         debugPrint('AppProvider: Activity logged: ${activity.activityType} for ${activity.vehicleNumber}');
-        _activities.insert(0, activity);
+        _activities.insert(0, finalActivity);
       }
       
       // Reload activities from database to ensure we have the latest
@@ -350,8 +363,8 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('🔄 AppProvider: Loading activities from Supabase...');
-      final data = await _supabaseService.getRecentActivities(limit: limit);
+      debugPrint('🔄 AppProvider: Loading activities from Supabase (Hub: $_selectedHub)...');
+      final data = await _supabaseService.getRecentActivities(limit: limit, hub: _selectedHub);
       
       debugPrint('📊 AppProvider: Received ${data.length} activities from service');
       
@@ -410,6 +423,9 @@ class AppProvider with ChangeNotifier {
       } else {
         debugPrint('   ⚠️ No valid activities after parsing');
       }
+      // The notifyListeners() call is already in the finally block,
+      // ensuring it's called after all processing, including parsing.
+      // No additional notifyListeners() is needed here.
     } catch (e, stackTrace) {
       debugPrint('❌ AppProvider: Error loading activities: $e');
       debugPrint('   Stack trace: $stackTrace');
@@ -426,22 +442,53 @@ class AppProvider with ChangeNotifier {
   Future<void> addIssue(ReportedIssue issue) async {
     debugPrint('AppProvider: Adding issue for vehicle ${issue.vehicleId}: ${issue.type}');
     
+    String? photoUrl;
+    String? videoUrl;
+
+    // Try to upload photos/videos, but don't fail if uploads fail
+    // Upload photo if exists
+    if (issue.photoPath != null) {
+      try {
+        debugPrint('AppProvider: Uploading issue photo...');
+        final XFile file = XFile(issue.photoPath!);
+        Uint8List bytes = await file.readAsBytes();
+        
+        // Compress image if it's too large (>2MB)
+        if (bytes.length > 2 * 1024 * 1024) {
+          debugPrint('AppProvider: Image is ${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB, compressing...');
+          bytes = await _compressImage(bytes);
+          debugPrint('AppProvider: Compressed to ${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB');
+        }
+        
+        final String fileName = 'issues/photos/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        photoUrl = await _supabaseService.uploadFile(fileName, bytes, 'image/jpeg');
+        
+        debugPrint('AppProvider: Issue photo uploaded: $photoUrl');
+      } catch (e) {
+        debugPrint('AppProvider: ⚠️ Photo upload failed, continuing without photo: $e');
+        // Don't set photoUrl - issue will be saved without photo
+      }
+    }
+
+    // Upload video if exists
+    if (issue.videoPath != null) {
+      try {
+        debugPrint('AppProvider: Uploading issue video...');
+        final XFile file = XFile(issue.videoPath!);
+        final Uint8List bytes = await file.readAsBytes();
+        
+        final String fileName = 'issues/videos/${DateTime.now().millisecondsSinceEpoch}.mp4';
+        videoUrl = await _supabaseService.uploadFile(fileName, bytes, 'video/mp4');
+        
+        debugPrint('AppProvider: Issue video uploaded: $videoUrl');
+      } catch (e) {
+        debugPrint('AppProvider: ⚠️ Video upload failed, continuing without video: $e');
+        // Don't set videoUrl - issue will be saved without video
+      }
+    }
+
+    // Always try to create maintenance job, even if media uploads failed
     try {
-      // Upload photos/videos to Supabase Storage if they exist
-      String? photoUrl;
-      String? videoUrl;
-
-      if (issue.photoPath != null) {
-        // In a real implementation, you'd read the file and upload it
-        // For now, we'll just store the path
-        photoUrl = issue.photoPath;
-      }
-
-      if (issue.videoPath != null) {
-        videoUrl = issue.videoPath;
-      }
-
-      // Create maintenance job in Supabase
       await _supabaseService.createMaintenanceJob({
         'vehicle_id': issue.vehicleId,
         'job_category': 'issue',
@@ -453,7 +500,7 @@ class AppProvider with ChangeNotifier {
         'video_url': videoUrl,
       });
 
-      debugPrint('AppProvider: Issue saved to Supabase');
+      debugPrint('AppProvider: ✅ Issue saved to Supabase (photo: ${photoUrl != null}, video: ${videoUrl != null})');
       
       // Also keep in local cache
       _reportedIssues.add(issue);
@@ -461,7 +508,7 @@ class AppProvider with ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      debugPrint('AppProvider: Error saving issue to Supabase: $e');
+      debugPrint('AppProvider: ❌ Error saving issue to database: $e');
       
       // Save locally and queue for sync
       _reportedIssues.add(issue);
@@ -473,6 +520,84 @@ class AppProvider with ChangeNotifier {
       });
       
       notifyListeners();
+      rethrow; // Re-throw so AddIssueScreen knows it failed
+    }
+  }
+
+  /// Compress image to reduce file size
+  Future<Uint8List> _compressImage(Uint8List imageBytes) async {
+    try {
+      // Decode the image
+      final img.Image? image = img.decodeImage(imageBytes);
+      if (image == null) {
+        debugPrint('Failed to decode image, returning original');
+        return imageBytes;
+      }
+
+      // Resize if too large (max 1920px on longest side)
+      img.Image resized = image;
+      if (image.width > 1920 || image.height > 1920) {
+        if (image.width > image.height) {
+          resized = img.copyResize(image, width: 1920);
+        } else {
+          resized = img.copyResize(image, height: 1920);
+        }
+      }
+
+      // Compress with quality 85
+      final compressed = img.encodeJpg(resized, quality: 85);
+      
+      // If still too large, reduce quality further
+      if (compressed.length > 2 * 1024 * 1024) {
+        debugPrint('Still too large, reducing quality to 70');
+        return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+      }
+      
+      return Uint8List.fromList(compressed);
+    } catch (e) {
+      debugPrint('Error compressing image: $e');
+      return imageBytes; // Return original if compression fails
+    }
+  }
+
+  /// Upload media for manual issues and return updated issue list with URLs
+  Future<void> uploadManualIssueMedia(List<Map<String, dynamic>> issues) async {
+    for (var i = 0; i < issues.length; i++) {
+      final issue = issues[i];
+      
+      // Upload Photo if exists
+      if (issue['photoPath'] != null && issue['photoUrl'] == null) {
+        try {
+          final String path = issue['photoPath'];
+          final XFile file = XFile(path);
+          final Uint8List bytes = await file.readAsBytes();
+          
+          final String fileName = 'issues/photos/${DateTime.now().millisecondsSinceEpoch}_${i}.jpg';
+          final String photoUrl = await _supabaseService.uploadFile(fileName, bytes, 'image/jpeg');
+          
+          issues[i]['photoUrl'] = photoUrl;
+          debugPrint('AppProvider: Manual issue photo uploaded: $photoUrl');
+        } catch (e) {
+          debugPrint('AppProvider: Error uploading manual issue photo: $e');
+        }
+      }
+      
+      // Upload Video if exists
+      if (issue['videoPath'] != null && issue['videoUrl'] == null) {
+        try {
+          final String path = issue['videoPath'];
+          final XFile file = XFile(path);
+          final Uint8List bytes = await file.readAsBytes();
+          
+          final String fileName = 'issues/videos/${DateTime.now().millisecondsSinceEpoch}_${i}.mp4';
+          final String videoUrl = await _supabaseService.uploadFile(fileName, bytes, 'video/mp4');
+          
+          issues[i]['videoUrl'] = videoUrl;
+          debugPrint('AppProvider: Manual issue video uploaded: $videoUrl');
+        } catch (e) {
+          debugPrint('AppProvider: Error uploading manual issue video: $e');
+        }
+      }
     }
   }
 
@@ -952,7 +1077,7 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  static const List<String> availableHubs = ['Nashik', 'Pune Station 1', 'Pune Station 2'];
+  static const List<String> availableHubs = ['Nashik', 'Pune Hinjewadi', 'Pune Kharadi'];
 
   Future<void> setSelectedHub(String hub) async {
     debugPrint('🔄 AppProvider: Changing hub to $hub');

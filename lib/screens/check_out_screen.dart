@@ -32,13 +32,17 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   Vehicle? _selectedVehicle;
   Driver? _selectedDriver;
   String? _ridePurpose; // 'B2B' or 'B2C'
+  String? _selectedChargingType;
   double _batteryPercentage = 50.0;
+  int _consecutiveDCCharges = 0;
+  bool _dcChargingBlocked = false;
   // Changed to tri-state: null = unchecked, true = OK, false = Issue
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
-  final List<Map<String, String>> _reportedIssues = [];
+  final List<Map<String, dynamic>> _reportedIssues = [];
   bool _isSearching = true;
   bool _hasLaunchedScanner = false;
+  bool _isInteriorClean = true;
 
   // Inventory photo categories
   final List<Map<String, dynamic>> _photoCategories = [
@@ -125,9 +129,6 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       {'id': 'tyres', 'label': 'Tyres'},
       {'id': 'stepney_tyre', 'label': 'Stepney Tyre'},
     ],
-    'Interior': [
-      {'id': 'interior_clean', 'label': 'Clean'},
-    ],
   };
 
   @override
@@ -184,6 +185,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       setState(() {
         _selectedVehicle = foundVehicle;
         _isSearching = false;
+        // Load DC charge count from vehicle metadata (optional field)
+        try {
+          _consecutiveDCCharges =
+              foundVehicle.toJson()['consecutive_dc_charges'] ?? 0;
+          _dcChargingBlocked = _consecutiveDCCharges >= 5;
+        } catch (e) {
+          // Field doesn't exist yet, use defaults
+          _consecutiveDCCharges = 0;
+          _dcChargingBlocked = false;
+        }
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -485,9 +496,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
 
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        _reportedIssues.add({
+        _reportedIssues.add(<String, dynamic>{
           'type': result['type'] as String,
           'description': result['description'] as String,
+          'photoPath': result['photoPath'] as String?,
+          'videoPath': result['videoPath'] as String?,
         });
       });
     }
@@ -611,7 +624,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
 
-      // Store odometer within daily_checks map to avoid missing column error
+      // Store interior cleaning status and odometer within daily_checks map to avoid missing column error
+      cleanedChecklist['interior_clean'] = _isInteriorClean;
       cleanedChecklist['odometer_reading'] = _odometerController.text.trim();
       cleanedChecklist['ride_purpose'] = _ridePurpose;
 
@@ -622,8 +636,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               ? 'maintenance'
               : 'active', // Set to maintenance if issues found
           'battery_level': _batteryPercentage.round(),
-          'last_charge_type': 'AC',
-          'last_charging_type': 'AC',
+          'last_charge_type': _selectedChargingType?.toUpperCase() ?? 'AC',
+          'last_charging_type': _selectedChargingType?.toUpperCase() ?? 'AC',
           'battery_health': _batteryPercentage.round(),
           'daily_checks': cleanedChecklist,
           'last_inventory_time': DateTime.now().toIso8601String(),
@@ -680,6 +694,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       }
 
       try {
+        // Upload manual issue media if any
+        if (_reportedIssues.isNotEmpty) {
+          try {
+            await provider.uploadManualIssueMedia(_reportedIssues);
+            debugPrint('✅ Manual issue media uploaded successfully');
+          } catch (e) {
+            debugPrint('⚠️ Warning: Failed to upload manual issue media: $e');
+          }
+        }
+
         await provider.logActivity(
           Activity(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -690,16 +714,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
             timestamp: DateTime.now(),
             metadata: {
               'battery_percentage': _batteryPercentage.round(),
-              'charging_type': 'AC',
+              'charging_type': _selectedChargingType ?? 'AC',
               'inspection_items_checked': cleanedChecklist.length,
               'photos_captured':
                   _inventoryPhotos.values.where((v) => v != null).length +
                   _additionalPhotos.length,
               'additional_photos_count': _additionalPhotos.length,
-              'issues_reported': issueItems.length,
+              'issues_reported': issueItems.length + _reportedIssues.length,
               'issue_details': issueItems,
+              'manual_issues': _reportedIssues,
               'odometer_reading': _odometerController.text.trim(),
               'ride_purpose': _ridePurpose,
+              'interior_clean': _isInteriorClean,
+              'daily_checks': cleanedChecklist,
               if (_selectedDriver != null) 'driver_id': _selectedDriver!.id,
               if (_selectedDriver != null) 'driver_name': _selectedDriver!.name,
             },
@@ -712,14 +739,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         // The vehicle data is already saved
       }
 
-      // 8. Refresh vehicles and activities to get updated data from database
-      debugPrint('🔄 Refreshing vehicles and activities from database...');
-      await provider.loadVehicles(forceRefresh: true);
-      await provider.loadActivities(limit: 20); // Load recent activities
-
-      debugPrint(
-        '✅ Check-out completed successfully - all data saved and verified',
-      );
+      // 8. Show success immediately and navigate back
+      debugPrint('✅ Check-out completed successfully - all data saved');
       if (issueItems.isNotEmpty) {
         debugPrint('⚠️ Admin notified about ${issueItems.length} issue(s)');
       }
@@ -734,6 +755,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           ),
         );
         context.pop();
+        
+        // Refresh data in background (don't await - let it run asynchronously)
+        debugPrint('🔄 Refreshing vehicles and activities in background...');
+        provider.loadVehicles(forceRefresh: true).then((_) {
+          debugPrint('✅ Vehicles refreshed');
+        }).catchError((e) {
+          debugPrint('⚠️ Background refresh failed: $e');
+        });
+        provider.loadActivities(limit: 20).then((_) {
+          debugPrint('✅ Activities refreshed');
+        }).catchError((e) {
+          debugPrint('⚠️ Background activity refresh failed: $e');
+        });
       }
     } catch (e) {
       debugPrint('❌ Error during check-out: $e');
@@ -888,6 +922,23 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     _buildBatteryPercentageSlider(),
 
                     const SizedBox(height: 24),
+                    _buildSectionTitle('Interior Cleaning Status'),
+                    const SizedBox(height: 12),
+                    _buildInteriorCleaningSelection(),
+
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Charging Type'),
+                    const SizedBox(height: 12),
+                    _buildChargingTypeSelection(),
+
+                    if (_reportedIssues.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Reported Issues'),
+                      const SizedBox(height: 12),
+                      _buildIssuesSection(),
+                    ],
+
+                    const SizedBox(height: 24),
                     _buildAddIssueButton(),
                   ],
                 ],
@@ -918,6 +969,15 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         setState(() {
           _selectedVehicle = vehicle;
           _isSearching = false;
+          // Load DC charge count from vehicle metadata
+          try {
+            _consecutiveDCCharges =
+                _selectedVehicle!.toJson()['consecutive_dc_charges'] ?? 0;
+            _dcChargingBlocked = _consecutiveDCCharges >= 5;
+          } catch (e) {
+            _consecutiveDCCharges = 0;
+            _dcChargingBlocked = false;
+          }
         });
       },
       child: Container(
@@ -1271,11 +1331,23 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   }
 
   Widget _buildRidePurposeSection() {
-    return Row(
+    return Column(
       children: [
-        Expanded(child: _buildPurposeButton('B2B', LucideIcons.briefcase)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildPurposeButton('B2C', LucideIcons.user)),
+        Row(
+          children: [
+            Expanded(child: _buildPurposeButton('B2B', LucideIcons.briefcase)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildPurposeButton('B2C', LucideIcons.user)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildPurposeButton('Periodic Service', LucideIcons.wrench)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildPurposeButton('Station Shifting', LucideIcons.refreshCw)),
+          ],
+        ),
       ],
     );
   }
@@ -1319,6 +1391,226 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     ? AppTheme.primaryBlue
                     : const Color(0xFF374151),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChargingTypeSelection() {
+    return Row(
+      children: [
+        Expanded(child: _buildChargingTypeCard('AC Charging', 'ac')),
+        const SizedBox(width: 12),
+        Expanded(child: _buildChargingTypeCard('DC Fast Charging', 'dc')),
+      ],
+    );
+  }
+
+  Widget _buildChargingTypeCard(String label, String type) {
+    final isSelected = _selectedChargingType == type;
+    final isDCBlocked = type == 'dc' && _dcChargingBlocked;
+    final showWarning = type == 'dc' && _consecutiveDCCharges >= 3;
+
+    return InkWell(
+      onTap:
+          isDCBlocked
+              ? () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'DC Charging is blocked. Please use AC charging to balance the battery!',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              : () {
+                setState(() {
+                  _selectedChargingType = type;
+                });
+              },
+      child: Opacity(
+        opacity: isDCBlocked ? 0.6 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color:
+                isDCBlocked
+                    ? Colors.red.withOpacity(0.1)
+                    : showWarning
+                    ? Colors.orange.withOpacity(0.1)
+                    : isSelected
+                    ? AppTheme.primaryGreen.withOpacity(0.1)
+                    : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color:
+                  isDCBlocked
+                      ? Colors.red
+                      : showWarning
+                      ? Colors.orange
+                      : isSelected
+                      ? AppTheme.primaryGreen
+                      : const Color(0xFFE5E7EB),
+              width: (isSelected || isDCBlocked || showWarning) ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isDCBlocked ? LucideIcons.ban : LucideIcons.zap,
+                    color:
+                        isDCBlocked
+                            ? Colors.red
+                            : showWarning
+                            ? Colors.orange
+                            : isSelected
+                            ? AppTheme.primaryGreen
+                            : const Color(0xFF6B7280),
+                    size: 32,
+                  ),
+                  if (type == 'dc' && _consecutiveDCCharges > 0)
+                    Positioned(
+                      right: -8,
+                      top: -8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              _consecutiveDCCharges >= 5
+                                  ? Colors.red
+                                  : _consecutiveDCCharges >= 3
+                                  ? Colors.orange
+                                  : Colors.blue,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$_consecutiveDCCharges/5',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color:
+                      isDCBlocked
+                          ? Colors.red
+                          : showWarning
+                          ? Colors.orange
+                          : isSelected
+                          ? AppTheme.primaryGreen
+                          : const Color(0xFF374151),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (isDCBlocked)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Use AC first!',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (showWarning && !isDCBlocked)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${5 - _consecutiveDCCharges} left',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInteriorCleaningSelection() {
+    return Row(
+      children: [
+        Expanded(child: _buildCleaningStatusCard('Clean', true)),
+        const SizedBox(width: 12),
+        Expanded(child: _buildCleaningStatusCard('Not Clean', false)),
+      ],
+    );
+  }
+
+  Widget _buildCleaningStatusCard(String label, bool isClean) {
+    final isSelected = _isInteriorClean == isClean;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isInteriorClean = isClean;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? (isClean
+                      ? AppTheme.primaryGreen.withOpacity(0.1)
+                      : AppTheme.dangerRed.withOpacity(0.1))
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                isSelected
+                    ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                    : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              isClean ? LucideIcons.sparkles : LucideIcons.trash2,
+              color:
+                  isSelected
+                      ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                      : const Color(0xFF6B7280),
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color:
+                    isSelected
+                        ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                        : const Color(0xFF374151),
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -1562,7 +1854,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        issue['type']!,
+                        issue['type']!.toString(),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -1570,7 +1862,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                         ),
                       ),
                       Text(
-                        issue['description']!,
+                        issue['description']!.toString(),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
@@ -1590,18 +1882,6 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                   constraints: const BoxConstraints(),
                 ),
               ],
-            ),
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: _navigateToAddIssue,
-          icon: const Icon(LucideIcons.plus, size: 16),
-          label: const Text('Add Issue'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 44),
-            side: const BorderSide(color: Color(0xFFE5E7EB)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),

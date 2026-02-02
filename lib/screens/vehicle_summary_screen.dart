@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../l10n/app_localizations.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -305,11 +306,17 @@ class _VehicleSummaryScreenState extends State<VehicleSummaryScreen> {
               const SizedBox(height: 12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.file(
-                  File(issue.photoPath!),
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+                child: kIsWeb
+                    ? Image.network(
+                        issue.photoPath!,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.file(
+                        File(issue.photoPath!),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ] else if (issue.videoPath != null) ...[
               Container(

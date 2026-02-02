@@ -40,7 +40,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
   // Changed to tri-state: null = unchecked, true = OK, false = Issue
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
-  final List<Map<String, String>> _reportedIssues = [];
+  final List<Map<String, dynamic>> _reportedIssues = [];
   bool _isSearching = true;
   bool _hasLaunchedScanner = false;
   bool _isInteriorClean = true;
@@ -129,9 +129,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
       {'id': 'taillight', 'label': 'Taillight'},
       {'id': 'tyres', 'label': 'Tyres'},
       {'id': 'stepney_tyre', 'label': 'Stepney Tyre'},
-    ],
-    'Interior': [
-      {'id': 'interior_clean', 'label': 'Clean'},
     ],
   };
 
@@ -502,9 +499,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
-        _reportedIssues.add({
+        _reportedIssues.add(<String, dynamic>{
           'type': result['type'] as String,
           'description': result['description'] as String,
+          'photoPath': result['photoPath'] as String?,
+          'videoPath': result['videoPath'] as String?,
         });
       });
     }
@@ -761,6 +760,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
       }
 
       try {
+        // Upload manual issue media if any
+        if (_reportedIssues.isNotEmpty) {
+          try {
+            await provider.uploadManualIssueMedia(_reportedIssues);
+            debugPrint('✅ Manual issue media uploaded successfully');
+          } catch (e) {
+            debugPrint('⚠️ Warning: Failed to upload manual issue media: $e');
+          }
+        }
+
         await provider.logActivity(
           Activity(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -777,11 +786,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   _inventoryPhotos.values.where((v) => v != null).length +
                   _additionalPhotos.length,
               'additional_photos_count': _additionalPhotos.length,
-              'issues_reported': issueItems.length,
+              'issues_reported': issueItems.length + _reportedIssues.length,
               'issue_details': issueItems,
+              'manual_issues': _reportedIssues,
               'driver_remark': _remarkController.text.trim(),
               'odometer_reading': _odometerController.text.trim(),
               'ride_purpose': _ridePurpose,
+              'interior_clean': _isInteriorClean,
+              'daily_checks': cleanedChecklist,
               if (_selectedDriver != null) 'driver_id': _selectedDriver!.id,
               if (_selectedDriver != null) 'driver_name': _selectedDriver!.name,
             },
@@ -794,14 +806,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
         // The vehicle data is already saved
       }
 
-      // 8. Refresh vehicles and activities to get updated data from database
-      debugPrint('🔄 Refreshing vehicles and activities from database...');
-      await provider.loadVehicles(forceRefresh: true);
-      await provider.loadActivities(limit: 20); // Load recent activities
-
-      debugPrint(
-        '✅ Check-in completed successfully - all data saved and verified',
-      );
+      // 8. Show success immediately and navigate back
+      debugPrint('✅ Check-in completed successfully - all data saved');
       if (issueItems.isNotEmpty) {
         debugPrint('⚠️ Admin notified about ${issueItems.length} issue(s)');
       }
@@ -816,6 +822,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         );
         context.pop();
+        
+        // Refresh data in background (don't await - let it run asynchronously)
+        debugPrint('🔄 Refreshing vehicles and activities in background...');
+        provider.loadVehicles(forceRefresh: true).then((_) {
+          debugPrint('✅ Vehicles refreshed');
+        }).catchError((e) {
+          debugPrint('⚠️ Background refresh failed: $e');
+        });
+        provider.loadActivities(limit: 20).then((_) {
+          debugPrint('✅ Activities refreshed');
+        }).catchError((e) {
+          debugPrint('⚠️ Background activity refresh failed: $e');
+        });
       }
     } catch (e) {
       debugPrint('❌ Error during check-in: $e');
@@ -908,29 +927,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     _buildRidePurposeSection(),
 
                     const SizedBox(height: 24),
-                    _buildSectionTitle('Odometer Reading'),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _odometerController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: 'Enter current odometer reading...',
-                        prefixIcon: const Icon(
-                          LucideIcons.gauge,
-                          color: Color(0xFF9CA3AF),
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF9FAFB),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
                     DriverAssignmentSection(
                       vehicleId: _selectedVehicle!.id,
                       hubId: provider.selectedHub,
@@ -972,6 +968,29 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Odometer Reading'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _odometerController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Enter current odometer reading...',
+                        prefixIcon: const Icon(
+                          LucideIcons.gauge,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     _buildRequiredInventoryPhotosSection(),
 
@@ -986,14 +1005,21 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     _buildBatteryPercentageSlider(),
 
                     const SizedBox(height: 24),
+                    _buildSectionTitle('Interior Cleaning Status'),
+                    const SizedBox(height: 12),
+                    _buildInteriorCleaningSelection(),
+
+                    const SizedBox(height: 24),
                     _buildSectionTitle('Charging Type'),
                     const SizedBox(height: 12),
                     _buildChargingTypeSelection(),
 
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Interior Cleaning Status'),
-                    const SizedBox(height: 12),
-                    _buildInteriorCleaningSelection(),
+                    if (_reportedIssues.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Reported Issues'),
+                      const SizedBox(height: 12),
+                      _buildIssuesSection(),
+                    ],
 
                     const SizedBox(height: 24),
                     _buildAddIssueButton(),
@@ -1581,11 +1607,23 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   Widget _buildRidePurposeSection() {
-    return Row(
+    return Column(
       children: [
-        Expanded(child: _buildPurposeButton('B2B', LucideIcons.briefcase)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildPurposeButton('B2C', LucideIcons.user)),
+        Row(
+          children: [
+            Expanded(child: _buildPurposeButton('B2B', LucideIcons.briefcase)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildPurposeButton('B2C', LucideIcons.user)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildPurposeButton('Periodic Service', LucideIcons.wrench)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildPurposeButton('Station Shifting', LucideIcons.refreshCw)),
+          ],
+        ),
       ],
     );
   }
@@ -1872,7 +1910,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        issue['type']!,
+                        issue['type']!.toString(),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -1880,7 +1918,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         ),
                       ),
                       Text(
-                        issue['description']!,
+                        issue['description']!.toString(),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
@@ -1900,18 +1938,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   constraints: const BoxConstraints(),
                 ),
               ],
-            ),
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: _navigateToAddIssue,
-          icon: const Icon(LucideIcons.plus, size: 16),
-          label: const Text('Add Issue'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 44),
-            side: const BorderSide(color: Color(0xFFE5E7EB)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),

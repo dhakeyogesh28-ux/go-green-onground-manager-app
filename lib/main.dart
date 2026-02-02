@@ -204,17 +204,6 @@ class _OGManagerAppState extends State<OGManagerApp> {
     final provider = context.watch<AppProvider>();
     final isInitialized = provider.isInitialized;
 
-    if (!isInitialized) {
-      return const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
-
     return MaterialApp.router(
       title: 'OG Manager App',
       theme: AppTheme.lightTheme,
@@ -233,6 +222,16 @@ class _OGManagerAppState extends State<OGManagerApp> {
       ],
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        if (!isInitialized) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return child!;
+      },
     );
   }
 }

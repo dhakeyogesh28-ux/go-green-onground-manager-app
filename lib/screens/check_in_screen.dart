@@ -34,9 +34,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
   Driver? _selectedDriver;
   String? _ridePurpose; // 'B2B' or 'B2C'
   String? _selectedChargingType;
-  double _batteryPercentage = 50.0;
+  int _consecutiveACCharges = 0;
   int _consecutiveDCCharges = 0;
-  bool _dcChargingBlocked = false;
   // Changed to tri-state: null = unchecked, true = OK, false = Issue
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
@@ -70,7 +69,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
     {'id': 'odometer', 'label': 'Odometer Photo', 'icon': LucideIcons.gauge},
     {'id': 'stepney_tyre', 'label': 'Stepney Tyre', 'icon': LucideIcons.disc},
     {'id': 'umbrella', 'label': 'Umbrella', 'icon': LucideIcons.umbrella},
-    {'id': 'battery', 'label': 'Battery', 'icon': LucideIcons.battery},
     {
       'id': 'engine_compartment',
       'label': 'Engine Compartment',
@@ -135,7 +133,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDCChargeCount();
     // Initialize checklist with null (unchecked)
     _inspectionSections.forEach((section, items) {
       for (var item in items) {
@@ -186,15 +183,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
       setState(() {
         _selectedVehicle = foundVehicle;
         _isSearching = false;
-        // Load DC charge count from vehicle metadata (optional field)
         try {
-          _consecutiveDCCharges =
-              foundVehicle.toJson()['consecutive_dc_charges'] ?? 0;
-          _dcChargingBlocked = _consecutiveDCCharges >= 5;
+          final json = foundVehicle.toJson();
+          _consecutiveACCharges = json['consecutive_ac_charges'] ?? 0;
+          _consecutiveDCCharges = json['consecutive_dc_charges'] ?? 0;
         } catch (e) {
-          // Field doesn't exist yet, use defaults
+          _consecutiveACCharges = 0;
           _consecutiveDCCharges = 0;
-          _dcChargingBlocked = false;
         }
       });
 
@@ -509,38 +504,29 @@ class _CheckInScreenState extends State<CheckInScreen> {
     }
   }
 
-  Future<void> _loadDCChargeCount() async {
-    // This will be called when a vehicle is selected
-    // For now, we'll load it from the vehicle's metadata
-  }
-
-  Future<void> _updateDCChargeCount() async {
+  Future<void> _updateChargeCount() async {
     if (_selectedVehicle == null || _selectedChargingType == null) return;
 
     try {
       final provider = context.read<AppProvider>();
 
-      if (_selectedChargingType == 'dc') {
-        _consecutiveDCCharges++;
-        setState(() {
-          _dcChargingBlocked = _consecutiveDCCharges >= 5;
+      if (_selectedChargingType == 'ac') {
+        _consecutiveACCharges++;
+        _consecutiveDCCharges = 0;
+        await provider.updateVehicleSummary(_selectedVehicle!.id, {
+          'consecutive_ac_charges': _consecutiveACCharges,
+          'consecutive_dc_charges': 0,
         });
+      } else if (_selectedChargingType == 'dc') {
+        _consecutiveDCCharges++;
+        _consecutiveACCharges = 0;
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
           'consecutive_dc_charges': _consecutiveDCCharges,
-        });
-      } else if (_selectedChargingType == 'ac') {
-        // Reset counter when AC is used
-        _consecutiveDCCharges = 0;
-        setState(() {
-          _dcChargingBlocked = false;
-        });
-        await provider.updateVehicleSummary(_selectedVehicle!.id, {
-          'consecutive_dc_charges': 0,
+          'consecutive_ac_charges': 0,
         });
       }
     } catch (e) {
-      debugPrint('Warning: Could not update DC charge count: $e');
-      // Continue with check-in even if counter update fails
+      debugPrint('Warning: Could not update charge count: $e');
     }
   }
 
@@ -563,17 +549,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
-    // Check DC charging limit
-    if (_selectedChargingType == 'dc' && _dcChargingBlocked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('DC charging blocked! Please use AC charging first.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
 
     final provider = context.read<AppProvider>();
 
@@ -582,8 +557,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
         '🚗 Starting check-in process for ${_selectedVehicle!.vehicleNumber}',
       );
 
-      // 1. Update DC charge counter
-      await _updateDCChargeCount();
+      // 1. Update charge counter
+      await _updateChargeCount();
 
       // 2. Save inspection checklist to database
       final Map<String, dynamic> cleanedChecklist = {};
@@ -701,10 +676,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
           'status': issueItems.isNotEmpty
               ? 'maintenance'
               : 'charging', // Set to maintenance if issues found
-          'battery_level': _batteryPercentage.round(),
           'last_charge_type': _selectedChargingType?.toUpperCase() ?? 'AC',
           'last_charging_type': _selectedChargingType?.toUpperCase() ?? 'AC',
-          'battery_health': _batteryPercentage.round(),
           'daily_checks': cleanedChecklist,
           'last_inventory_time': DateTime.now().toIso8601String(),
           'last_inspection_date': DateTime.now().toIso8601String().split(
@@ -740,7 +713,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
             metadata: {
               'vehicle_number': _selectedVehicle!.vehicleNumber,
               'driver_name': _selectedDriver!.name,
-              'battery_percentage': _batteryPercentage.round(),
               'charging_type': _selectedChargingType,
               'issues_reported': issueItems.length,
             },
@@ -779,8 +751,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
             userName: provider.userName ?? provider.userEmail ?? 'Unknown',
             timestamp: DateTime.now(),
             metadata: {
-              'battery_percentage': _batteryPercentage.round(),
               'charging_type': _selectedChargingType,
+              'consecutive_ac_charges': _consecutiveACCharges,
+              'consecutive_dc_charges': _consecutiveDCCharges,
               'inspection_items_checked': cleanedChecklist.length,
               'photos_captured':
                   _inventoryPhotos.values.where((v) => v != null).length +
@@ -999,10 +972,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     const SizedBox(height: 12),
                     _buildStaticInspectionChecklist(),
 
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Battery Level'),
-                    const SizedBox(height: 12),
-                    _buildBatteryPercentageSlider(),
 
                     const SizedBox(height: 24),
                     _buildSectionTitle('Interior Cleaning Status'),
@@ -1323,222 +1292,161 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
   }
 
-  Widget _buildBatteryPercentageSlider() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Battery Level',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_batteryPercentage.round()}%',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppTheme.primaryBlue,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: AppTheme.primaryBlue,
-              inactiveTrackColor: const Color(0xFFE5E7EB),
-              thumbColor: AppTheme.primaryBlue,
-              overlayColor: AppTheme.primaryBlue.withOpacity(0.2),
-              trackHeight: 6,
-            ),
-            child: Slider(
-              value: _batteryPercentage,
-              min: 0,
-              max: 100,
-              divisions: 100,
-              onChanged: (value) {
-                setState(() {
-                  _batteryPercentage = value;
-                });
-              },
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '0%',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              Text(
-                '100%',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildChargingTypeSelection() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildChargingTypeCard('AC Charging', 'ac')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildChargingTypeCard('DC Fast Charging', 'dc')),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            _consecutiveACCharges >= 5
+                ? "Your next charging is DC"
+                : "Your next charging is AC",
+            style: TextStyle(
+              fontSize: 14,
+              color: _consecutiveACCharges >= 5 ? Colors.red : Colors.blue,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: _buildChargingTypeCard('AC Charging', 'ac')),
+            const SizedBox(width: 12),
+            Expanded(child: _buildChargingTypeCard('DC Fast Charging', 'dc')),
+          ],
+        ),
+        if (_consecutiveACCharges >= 5)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.info, color: Colors.blue, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "Note: It's recommended to do DC charging after every 5 AC charges for better battery health.",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildChargingTypeCard(String label, String type) {
     final isSelected = _selectedChargingType == type;
-    final isDCBlocked = type == 'dc' && _dcChargingBlocked;
-    final showWarning =
-        type == 'dc' && _consecutiveDCCharges >= 3 && !_dcChargingBlocked;
 
     return InkWell(
-      onTap: isDCBlocked
-          ? null
-          : () {
-              setState(() {
-                _selectedChargingType = type;
-              });
-            },
-      child: Opacity(
-        opacity: isDCBlocked ? 0.6 : 1.0,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDCBlocked
-                ? Colors.red.withOpacity(0.1)
-                : showWarning
-                ? Colors.orange.withOpacity(0.1)
-                : isSelected
-                ? AppTheme.primaryGreen.withOpacity(0.1)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDCBlocked
-                  ? Colors.red
-                  : showWarning
-                  ? Colors.orange
-                  : isSelected
-                  ? AppTheme.primaryGreen
-                  : const Color(0xFFE5E7EB),
-              width: (isSelected || isDCBlocked || showWarning) ? 2 : 1,
-            ),
+      onTap: () {
+        setState(() {
+          _selectedChargingType = type;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primaryGreen.withOpacity(0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.primaryGreen
+                : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
           ),
-          child: Column(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    isDCBlocked ? LucideIcons.ban : LucideIcons.zap,
-                    color: isDCBlocked
-                        ? Colors.red
-                        : showWarning
-                        ? Colors.orange
-                        : isSelected
-                        ? AppTheme.primaryGreen
-                        : const Color(0xFF6B7280),
-                    size: 32,
-                  ),
-                  if (type == 'dc' && _consecutiveDCCharges > 0)
-                    Positioned(
-                      right: -8,
-                      top: -8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _consecutiveDCCharges >= 5
-                              ? Colors.red
-                              : _consecutiveDCCharges >= 3
-                              ? Colors.orange
-                              : Colors.blue,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$_consecutiveDCCharges/5',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+        ),
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  LucideIcons.zap,
+                  color: isSelected
+                      ? AppTheme.primaryGreen
+                      : const Color(0xFF6B7280),
+                  size: 32,
+                ),
+                if (type == 'ac')
+                  Positioned(
+                    right: -12,
+                    top: -12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _consecutiveACCharges >= 5
+                            ? Colors.red
+                            : Colors.blue,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$_consecutiveACCharges/5',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: isDCBlocked
-                      ? Colors.red
-                      : showWarning
-                      ? Colors.orange
-                      : isSelected
-                      ? AppTheme.primaryGreen
-                      : const Color(0xFF374151),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              if (isDCBlocked)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Use AC first!',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.red,
-                      fontWeight: FontWeight.w600,
+                  ),
+                if (type == 'dc')
+                  Positioned(
+                    right: -12,
+                    top: -12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$_consecutiveDCCharges',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              if (showWarning && !isDCBlocked)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '${5 - _consecutiveDCCharges} left',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: isSelected
+                    ? AppTheme.primaryGreen
+                    : const Color(0xFF374151),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:car_license_plate/car_license_plate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -28,15 +27,15 @@ import 'package:mobile/models/driver.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Supabase
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
     anonKey: SupabaseConfig.supabaseAnonKey,
   );
-  
+
   debugPrint('✅ Supabase initialized successfully');
-  
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppProvider(),
@@ -73,10 +72,7 @@ class _OGManagerAppState extends State<OGManagerApp> {
           path: '/dashboard',
           builder: (context, state) => const DashboardScreen(),
         ),
-        GoRoute(
-          path: '/hub',
-          builder: (context, state) => const HubScreen(),
-        ),
+        GoRoute(path: '/hub', builder: (context, state) => const HubScreen()),
         GoRoute(
           path: '/check-in',
           builder: (context, state) => const CheckInScreen(),
@@ -102,23 +98,28 @@ class _OGManagerAppState extends State<OGManagerApp> {
         ),
         GoRoute(
           path: '/add-service/:id',
-          builder: (context, state) => AddServiceScreen(vehicleId: state.pathParameters['id']!),
+          builder: (context, state) =>
+              AddServiceScreen(vehicleId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/upload-photos/:id',
-          builder: (context, state) => UploadPhotosScreen(vehicleId: state.pathParameters['id']!),
+          builder: (context, state) =>
+              UploadPhotosScreen(vehicleId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/add-issue/:id',
-          builder: (context, state) => AddIssueScreen(vehicleId: state.pathParameters['id']!),
+          builder: (context, state) =>
+              AddIssueScreen(vehicleId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/vehicle-summary/:id',
-          builder: (context, state) => VehicleSummaryScreen(vehicleId: state.pathParameters['id']!),
+          builder: (context, state) =>
+              VehicleSummaryScreen(vehicleId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/inventory-photos/:id',
-          builder: (context, state) => InventoryPhotosScreen(vehicleId: state.pathParameters['id']!),
+          builder: (context, state) =>
+              InventoryPhotosScreen(vehicleId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/settings',
@@ -135,17 +136,19 @@ class _OGManagerAppState extends State<OGManagerApp> {
             debugPrint('🚀 Router: Navigating to /add-driver');
             debugPrint('📦 extra type: ${extra?.runtimeType}');
             debugPrint('📦 extra data: $extra');
-            
+
             Driver? driver;
             if (extra is Driver) {
               driver = extra;
               debugPrint('✅ extra IS a Driver object');
             } else if (extra != null) {
-              debugPrint('⚠️ extra is NOT a Driver object! It is a ${extra.runtimeType}');
+              debugPrint(
+                '⚠️ extra is NOT a Driver object! It is a ${extra.runtimeType}',
+              );
             } else {
               debugPrint('ℹ️ extra is null (Add Mode)');
             }
-            
+
             return AddDriverScreen(driver: driver);
           },
         ),
@@ -153,19 +156,25 @@ class _OGManagerAppState extends State<OGManagerApp> {
       redirect: (context, state) {
         // If not initialized, don't redirect yet
         if (!appProvider.isInitialized) {
-          debugPrint('GoRouter: [WAIT] Provider not initialized. Staying at ${state.matchedLocation}');
+          debugPrint(
+            'GoRouter: [WAIT] Provider not initialized. Staying at ${state.matchedLocation}',
+          );
           return null;
         }
 
         final isLoggedIn = appProvider.isLoggedIn;
         final currentPath = state.matchedLocation;
         final isLoggingIn = currentPath == '/login';
-        
-        debugPrint('GoRouter: [REDIRECT CHECK] Path: $currentPath, isLoggedIn: $isLoggedIn');
+
+        debugPrint(
+          'GoRouter: [REDIRECT CHECK] Path: $currentPath, isLoggedIn: $isLoggedIn',
+        );
 
         // If not logged in and not on login page, go to login
         if (!isLoggedIn && !isLoggingIn) {
-          debugPrint('GoRouter: [AUTH GUARD] Unauthorized access to $currentPath. Redirecting to /login');
+          debugPrint(
+            'GoRouter: [AUTH GUARD] Unauthorized access to $currentPath. Redirecting to /login',
+          );
           return '/login';
         }
 
@@ -173,29 +182,31 @@ class _OGManagerAppState extends State<OGManagerApp> {
         if (isLoggedIn && !isLoggingIn && currentPath != '/') {
           appProvider.setLastRoute(currentPath);
         }
-        
+
         // Recovery logic: if at root and logged in, check for saved route
         if (isLoggedIn && (currentPath == '/' || currentPath == '/dashboard')) {
-          if (appProvider.lastRoute != null && appProvider.lastRoute != currentPath) {
+          if (appProvider.lastRoute != null &&
+              appProvider.lastRoute != currentPath) {
             final target = appProvider.lastRoute!;
             debugPrint('GoRouter: [RECOVERY] Found saved route: $target');
             appProvider.clearLastRoute(); // Clear so it only happens once
             return target;
           }
         }
-        
+
         // If logged in and on login page, go to dashboard
         if (isLoggedIn && isLoggingIn) {
-          debugPrint('GoRouter: [AUTH GUARD] Already logged in. Redirecting from /login to /dashboard');
+          debugPrint(
+            'GoRouter: [AUTH GUARD] Already logged in. Redirecting from /login to /dashboard',
+          );
           return '/dashboard';
         }
 
         debugPrint('GoRouter: [AUTH GUARD] Proceeding to $currentPath');
         return null;
       },
-      errorBuilder: (context, state) => Scaffold(
-        body: Center(child: Text('Error: ${state.error}')),
-      ),
+      errorBuilder: (context, state) =>
+          Scaffold(body: Center(child: Text('Error: ${state.error}'))),
     );
   }
 
@@ -216,18 +227,13 @@ class _OGManagerAppState extends State<OGManagerApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('en'),
-        Locale('hi'),
-      ],
+      supportedLocales: const [Locale('en'), Locale('hi')],
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
         if (!isInitialized) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
         return child!;

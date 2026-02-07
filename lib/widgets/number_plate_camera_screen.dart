@@ -183,7 +183,16 @@ class _NumberPlateCameraScreenState extends State<NumberPlateCameraScreen>
   void dispose() {
     _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+
+    final cameraController = _controller;
+    _controller = null;
+
+    if (cameraController != null) {
+      cameraController.dispose().catchError((e) {
+        debugPrint('Error disposing camera: $e');
+      });
+    }
+
     _textRecognizer.close();
     super.dispose();
   }

@@ -15,6 +15,7 @@ import '../widgets/number_plate_camera_screen.dart';
 import '../widgets/driver_assignment_section.dart';
 import '../services/challan_service.dart';
 import '../services/driver_service.dart';
+import '../services/supabase_service.dart';
 import 'package:mobile/l10n/app_localizations.dart';
 
 class CheckInScreen extends StatefulWidget {
@@ -41,6 +42,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
   final List<Map<String, dynamic>> _reportedIssues = [];
+  final List<String> _maintenanceJobIds =
+      []; // Track job IDs to link to inventory record
   bool _isSearching = true;
   bool _hasLaunchedScanner = false;
   bool _isInteriorClean = true;
@@ -161,15 +164,21 @@ class _CheckInScreenState extends State<CheckInScreen> {
       _hasLaunchedScanner = true;
     });
 
-    final String? plateNumber = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (context) => const NumberPlateCameraScreen()),
-    );
+    try {
+      final String? plateNumber = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const NumberPlateCameraScreen(),
+        ),
+      );
 
-    if (plateNumber != null && mounted) {
-      // Set search text and search for vehicle
-      _searchController.text = plateNumber;
-      _searchVehicle(plateNumber);
+      if (plateNumber != null && mounted) {
+        // Set search text and search for vehicle
+        _searchController.text = plateNumber;
+        _searchVehicle(plateNumber);
+      }
+    } catch (e) {
+      debugPrint('Error launching scanner: $e');
     }
   }
 
@@ -495,17 +504,41 @@ class _CheckInScreenState extends State<CheckInScreen> {
   void _navigateToAddIssue() async {
     if (_selectedVehicle == null) return;
 
+    debugPrint('📝 Navigating to Add Issue screen...');
     final result = await context.push('/add-issue/${_selectedVehicle!.id}');
+    debugPrint('📝 Add Issue result: $result');
 
     if (result != null && result is Map<String, dynamic>) {
+      final newIssue = <String, dynamic>{
+        'vehicleId': _selectedVehicle!.id,
+        'type': result['type'] as String,
+        'description': result['description'] as String,
+        'photoPath': result['photoPath'] as String?,
+        'videoPath': result['videoPath'] as String?,
+        // Include the uploaded URLs from AddIssueScreen!
+        'photoUrl': result['photoUrl'] as String?,
+        'videoUrl': result['videoUrl'] as String?,
+        'jobId': result['jobId'] as String?, // Track the maintenance job ID
+      };
+
       setState(() {
-        _reportedIssues.add(<String, dynamic>{
-          'type': result['type'] as String,
-          'description': result['description'] as String,
-          'photoPath': result['photoPath'] as String?,
-          'videoPath': result['videoPath'] as String?,
-        });
+        _reportedIssues.add(newIssue);
+        // Track the job ID for linking to inventory record later
+        if (result['jobId'] != null) {
+          _maintenanceJobIds.add(result['jobId'] as String);
+        }
       });
+
+      debugPrint('✅ Issue added to _reportedIssues:');
+      debugPrint('   Type: ${newIssue['type']}');
+      debugPrint('   Description: ${newIssue['description']}');
+      debugPrint('   PhotoPath: ${newIssue['photoPath']}');
+      debugPrint('   PhotoUrl: ${newIssue['photoUrl']}');
+      debugPrint('   JobId: ${newIssue['jobId']}');
+      debugPrint('   Total issues now: ${_reportedIssues.length}');
+      debugPrint('   Tracked job IDs: $_maintenanceJobIds');
+    } else {
+      debugPrint('⚠️ Add Issue returned null or wrong type');
     }
   }
 
@@ -618,6 +651,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
           '⚠️ Creating maintenance jobs for ${issueItems.length} issues...',
         );
 
+        // NOTE: Inspection checklist issues do NOT get photos attached
+        // Only MANUAL issues (added via "Add Issue" button) have specific photos
+
         for (var issueLabel in issueItems) {
           try {
             await provider.addIssue(
@@ -627,14 +663,18 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     '_' +
                     issueLabel.hashCode.toString(),
                 vehicleId: _selectedVehicle!.id,
-                type: 'Inspection Issue',
+                type:
+                    issueLabel, // Use specific issue type instead of generic "Inspection Issue"
                 description:
                     'Issue detected during check-in inspection: $issueLabel',
                 timestamp: DateTime.now(),
+                photoPath: null, // NO photo for inspection checklist items
               ),
             );
 
-            debugPrint('✅ Created maintenance job for: $issueLabel');
+            debugPrint(
+              '✅ Created maintenance job for: $issueLabel (no photo - checklist item)',
+            );
           } catch (e) {
             debugPrint(
               'Warning: Could not create maintenance job for $issueLabel: $e',
@@ -656,15 +696,21 @@ class _CheckInScreenState extends State<CheckInScreen> {
       }
 
       // 4. Save inventory photos to Supabase Storage and database
+      // Collect URLs to save in inventory record
+      final Map<String, String> uploadedPhotoUrls = {};
+
       debugPrint('📸 Saving ${_inventoryPhotos.length} inventory photos...');
       for (var entry in _inventoryPhotos.entries) {
         if (entry.value != null) {
           try {
-            await provider.setInventoryPhoto(
+            final photoUrl = await provider.setInventoryPhoto(
               _selectedVehicle!.id,
               entry.key,
               entry.value!,
             );
+            if (photoUrl != null) {
+              uploadedPhotoUrls[entry.key] = photoUrl;
+            }
           } catch (e) {
             debugPrint('Warning: Could not save photo ${entry.key}: $e');
             // Continue even if photo upload fails
@@ -676,15 +722,22 @@ class _CheckInScreenState extends State<CheckInScreen> {
       debugPrint('📸 Saving ${_additionalPhotos.length} additional photos...');
       for (int i = 0; i < _additionalPhotos.length; i++) {
         try {
-          await provider.setInventoryPhoto(
+          final photoUrl = await provider.setInventoryPhoto(
             _selectedVehicle!.id,
             'additional_photo_$i',
             _additionalPhotos[i],
           );
+          if (photoUrl != null) {
+            uploadedPhotoUrls['additional_photo_$i'] = photoUrl;
+          }
         } catch (e) {
           debugPrint('Warning: Could not save additional photo $i: $e');
         }
       }
+
+      debugPrint(
+        '📸 Collected ${uploadedPhotoUrls.length} photo URLs for inventory record',
+      );
 
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
@@ -696,7 +749,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
       cleanedChecklist['ride_purpose'] = _ridePurpose;
 
       try {
-        await provider.updateVehicleSummary(_selectedVehicle!.id, {
+        // Parse odometer to integer for the dedicated column
+        final odometerText = _odometerController.text.trim();
+        final odometerValue = int.tryParse(
+          odometerText.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+
+        final updateData = <String, dynamic>{
           'is_vehicle_in': true,
           'status': issueItems.isNotEmpty
               ? 'maintenance'
@@ -714,7 +773,17 @@ class _CheckInScreenState extends State<CheckInScreen> {
               issueItems.isNotEmpty, // Flag for attention if issues found
           'last_check_in_time': DateTime.now()
               .toIso8601String(), // Track check-in time
-        });
+        };
+
+        // Add odometer to dedicated column if provided
+        if (odometerValue != null && odometerValue > 0) {
+          updateData['latest_odometer_reading'] = odometerValue;
+          debugPrint(
+            '📊 Updating latest_odometer_reading to: $odometerValue km',
+          );
+        }
+
+        await provider.updateVehicleSummary(_selectedVehicle!.id, updateData);
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {
         debugPrint('❌ CRITICAL: Failed to save vehicle data to database: $e');
@@ -748,6 +817,27 @@ class _CheckInScreenState extends State<CheckInScreen> {
         } catch (e) {
           debugPrint('Warning: Could not mark driver attendance: $e');
           // Continue with check-in even if attendance marking fails
+        }
+      }
+
+      // 6.5 Save driver remark to service_remarks table if provided
+      final driverRemarkText = _remarkController.text.trim();
+      if (driverRemarkText.isNotEmpty) {
+        try {
+          debugPrint('💬 Saving driver remark to service_remarks table...');
+          await SupabaseService().saveDriverRemark(
+            vehicleId: _selectedVehicle!.id,
+            remark: driverRemarkText,
+            remarkType: 'driver',
+            userName: provider.userName ?? provider.userEmail ?? 'Unknown',
+          );
+          debugPrint('✅ Driver remark saved to service_remarks table');
+        } catch (e) {
+          debugPrint(
+            '⚠️ Warning: Could not save driver remark to service_remarks: $e',
+          );
+          // Continue with check-in even if remark save fails
+          // The remark is also stored in daily_checks as backup
         }
       }
 
@@ -806,6 +896,141 @@ class _CheckInScreenState extends State<CheckInScreen> {
         // The vehicle data is already saved
       }
 
+      // 7.5 Save comprehensive inventory record to mobile_inventory_records table
+      // This record will contain ALL data for this inventory session including issues with photos
+      try {
+        debugPrint(
+          '📋 Saving inventory_in record to mobile_inventory_records...',
+        );
+
+        final odometerText = _odometerController.text.trim();
+        final odometerValue = int.tryParse(
+          odometerText.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+
+        // Get manual issues directly from provider (stored when AddIssue was called)
+        // This is the SIMPLEST and MOST RELIABLE approach:
+        // - addIssue() stores complete issue data (type, description, photoUrl) in provider
+        // - We use that data directly here - no need to query mobile_maintenance_jobs
+        final sessionIssues = provider.currentSessionIssues;
+        debugPrint('🔍 Session issues from provider: ${sessionIssues.length}');
+        for (var issue in sessionIssues) {
+          debugPrint('   → ${issue['type']}: photoUrl=${issue['photoUrl']}');
+        }
+
+        // Convert to the format expected by manual_issues field
+        // ONLY include issues that have photos (manual issues)
+        List<Map<String, dynamic>> manualIssuesWithPhotos = sessionIssues
+            .where(
+              (issue) =>
+                  issue['photoUrl'] != null &&
+                  issue['photoUrl'].toString().isNotEmpty,
+            )
+            .map(
+              (issue) => {
+                'type': issue['type']?.toString() ?? 'Issue',
+                'description': issue['description']?.toString() ?? '',
+                'photoUrl': issue['photoUrl']?.toString(),
+                'videoUrl': issue['videoUrl']?.toString(),
+              },
+            )
+            .toList();
+
+        // Get job IDs for linking
+        List<String> jobIdsToLink = sessionIssues
+            .where((issue) => issue['jobId'] != null)
+            .map((issue) => issue['jobId'].toString())
+            .toList();
+
+        debugPrint(
+          '📋 Final manualIssuesWithPhotos: ${manualIssuesWithPhotos.length}',
+        );
+        for (var issue in manualIssuesWithPhotos) {
+          debugPrint('   → ${issue['type']}: photoUrl=${issue['photoUrl']}');
+        }
+
+        final inventoryRecord = {
+          'vehicle_id': _selectedVehicle!.id,
+          'registration_number': _selectedVehicle!.vehicleNumber,
+          'inventory_type': 'inventory_in', // 'inventory_in' or 'inventory_out'
+          'check_date': DateTime.now().toIso8601String(),
+          'staff_name': provider.userName ?? provider.userEmail ?? 'Unknown',
+          'hub_name': provider.selectedHub ?? 'Unknown',
+
+          // Charging Info
+          'charging_type': _selectedChargingType?.toUpperCase() ?? 'AC',
+
+          // Odometer
+          'odometer_reading': odometerValue,
+
+          // Driver Info
+          'driver_id': _selectedDriver?.id,
+          'driver_name': _selectedDriver?.name,
+          'ride_purpose': _ridePurpose,
+
+          // Inspection & Condition
+          'inspection_checklist': cleanedChecklist,
+          'interior_clean': _isInteriorClean,
+          'driver_remark': _remarkController.text.trim(),
+
+          // Issues - ALL issue data stored directly in this record
+          'issues_count': issueItems.length + manualIssuesWithPhotos.length,
+          'issue_items':
+              issueItems, // Inspection checklist issues (no photos) - legacy field
+          // New issue columns
+          'checklist_issues':
+              issueItems, // TEXT[] - inspection items marked as Issue
+          'checklist_issues_count': issueItems.length,
+          'manual_issues':
+              manualIssuesWithPhotos, // JSONB - manual issues with photo URLs
+          'manual_issues_count': manualIssuesWithPhotos.length,
+          'has_issues':
+              issueItems.isNotEmpty || manualIssuesWithPhotos.isNotEmpty,
+
+          // Photos - save URLs as Map (category -> URL) for admin panel to use
+          'photos_count': uploadedPhotoUrls.length,
+          'photo_categories': uploadedPhotoUrls, // Map of category -> URL
+          'additional_photos_count': uploadedPhotoUrls.keys
+              .where((k) => k.startsWith('additional_photo_'))
+              .length,
+
+          // Metadata
+          'created_at': DateTime.now().toIso8601String(),
+          'app_version': '1.0.0',
+        };
+
+        final createdRecord = await SupabaseService().createInventoryRecord(
+          inventoryRecord,
+        );
+        final inventoryRecordId = createdRecord['id']?.toString();
+
+        debugPrint('✅ Inventory_in record saved to mobile_inventory_records');
+        debugPrint('   - Record ID: $inventoryRecordId');
+        debugPrint('   - Checklist issues: ${issueItems.length}');
+        debugPrint(
+          '   - Manual issues with photos: ${manualIssuesWithPhotos.length}',
+        );
+        debugPrint('   - Inventory photos: ${uploadedPhotoUrls.length}');
+
+        // Link maintenance jobs to this inventory record (if any)
+        if (inventoryRecordId != null && jobIdsToLink.isNotEmpty) {
+          debugPrint(
+            '🔗 Linking ${jobIdsToLink.length} maintenance jobs to inventory record...',
+          );
+          await SupabaseService().linkJobsToInventoryRecord(
+            jobIdsToLink,
+            inventoryRecordId,
+          );
+          debugPrint('✅ Maintenance jobs linked to inventory record');
+        }
+
+        // Clear session data (job IDs and issues) after successful check-in
+        provider.clearSessionData();
+      } catch (e) {
+        debugPrint('⚠️ Warning: Could not save inventory record: $e');
+        // Continue even if inventory record save fails - vehicle data is already saved
+      }
+
       // 8. Show success immediately and navigate back
       debugPrint('✅ Check-in completed successfully - all data saved');
       if (issueItems.isNotEmpty) {
@@ -822,19 +1047,25 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         );
         context.pop();
-        
+
         // Refresh data in background (don't await - let it run asynchronously)
         debugPrint('🔄 Refreshing vehicles and activities in background...');
-        provider.loadVehicles(forceRefresh: true).then((_) {
-          debugPrint('✅ Vehicles refreshed');
-        }).catchError((e) {
-          debugPrint('⚠️ Background refresh failed: $e');
-        });
-        provider.loadActivities(limit: 20).then((_) {
-          debugPrint('✅ Activities refreshed');
-        }).catchError((e) {
-          debugPrint('⚠️ Background activity refresh failed: $e');
-        });
+        provider
+            .loadVehicles(forceRefresh: true)
+            .then((_) {
+              debugPrint('✅ Vehicles refreshed');
+            })
+            .catchError((e) {
+              debugPrint('⚠️ Background refresh failed: $e');
+            });
+        provider
+            .loadActivities(limit: 20)
+            .then((_) {
+              debugPrint('✅ Activities refreshed');
+            })
+            .catchError((e) {
+              debugPrint('⚠️ Background activity refresh failed: $e');
+            });
       }
     } catch (e) {
       debugPrint('❌ Error during check-in: $e');
@@ -890,6 +1121,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
                       prefixIcon: const Icon(
                         LucideIcons.search,
                         color: Color(0xFF9CA3AF),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(
+                          LucideIcons.camera,
+                          color: AppTheme.primaryBlue,
+                        ),
+                        onPressed: () {
+                          // Allow re-launching the scanner manualy
+                          setState(() {
+                            _hasLaunchedScanner = false;
+                          });
+                          _launchPlateScanner();
+                        },
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF9FAFB),
@@ -1619,9 +1863,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildPurposeButton('Periodic Service', LucideIcons.wrench)),
+            Expanded(
+              child: _buildPurposeButton(
+                'Periodic Service',
+                LucideIcons.wrench,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildPurposeButton('Station Shifting', LucideIcons.refreshCw)),
+            Expanded(
+              child: _buildPurposeButton(
+                'Station Shifting',
+                LucideIcons.refreshCw,
+              ),
+            ),
           ],
         ),
       ],

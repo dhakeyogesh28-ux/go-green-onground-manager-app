@@ -15,6 +15,7 @@ import '../widgets/number_plate_camera_screen.dart';
 import '../widgets/driver_assignment_section.dart';
 import '../services/challan_service.dart';
 import '../services/driver_service.dart';
+import '../services/supabase_service.dart';
 import 'package:mobile/l10n/app_localizations.dart';
 
 class CheckOutScreen extends StatefulWidget {
@@ -40,6 +41,8 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
   final List<Map<String, dynamic>> _reportedIssues = [];
+  final List<String> _maintenanceJobIds =
+      []; // Track job IDs to link to inventory record
   bool _isSearching = true;
   bool _hasLaunchedScanner = false;
   bool _isInteriorClean = true;
@@ -160,15 +163,21 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       _hasLaunchedScanner = true;
     });
 
-    final String? plateNumber = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (context) => const NumberPlateCameraScreen()),
-    );
+    try {
+      final String? plateNumber = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const NumberPlateCameraScreen(),
+        ),
+      );
 
-    if (plateNumber != null && mounted) {
-      // Set search text and search for vehicle
-      _searchController.text = plateNumber;
-      _searchVehicle(plateNumber);
+      if (plateNumber != null && mounted) {
+        // Set search text and search for vehicle
+        _searchController.text = plateNumber;
+        _searchVehicle(plateNumber);
+      }
+    } catch (e) {
+      debugPrint('Error launching scanner: $e');
     }
   }
 
@@ -492,21 +501,50 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
   void _navigateToAddIssue() async {
     if (_selectedVehicle == null) return;
 
+    debugPrint('📝 Navigating to Add Issue screen...');
     final result = await context.push('/add-issue/${_selectedVehicle!.id}');
+    debugPrint('📝 Add Issue result: $result');
 
     if (result != null && result is Map<String, dynamic>) {
+      final newIssue = <String, dynamic>{
+        'vehicleId': _selectedVehicle!.id,
+        'type': result['type'] as String,
+        'description': result['description'] as String,
+        'photoPath': result['photoPath'] as String?,
+        'videoPath': result['videoPath'] as String?,
+        // Include the uploaded URLs from AddIssueScreen!
+        'photoUrl': result['photoUrl'] as String?,
+        'videoUrl': result['videoUrl'] as String?,
+        'jobId': result['jobId'] as String?, // Track the maintenance job ID
+      };
+
       setState(() {
-        _reportedIssues.add(<String, dynamic>{
-          'type': result['type'] as String,
-          'description': result['description'] as String,
-          'photoPath': result['photoPath'] as String?,
-          'videoPath': result['videoPath'] as String?,
-        });
+        _reportedIssues.add(newIssue);
+        // Track the job ID for linking to inventory record later
+        if (result['jobId'] != null) {
+          _maintenanceJobIds.add(result['jobId'] as String);
+        }
       });
+
+      debugPrint('✅ Issue added to _reportedIssues:');
+      debugPrint('   Type: ${newIssue['type']}');
+      debugPrint('   Description: ${newIssue['description']}');
+      debugPrint('   PhotoPath: ${newIssue['photoPath']}');
+      debugPrint('   PhotoUrl: ${newIssue['photoUrl']}');
+      debugPrint('   JobId: ${newIssue['jobId']}');
+      debugPrint('   Total issues now: ${_reportedIssues.length}');
+      debugPrint('   Tracked job IDs: $_maintenanceJobIds');
+    } else {
+      debugPrint('⚠️ Add Issue returned null or wrong type');
     }
   }
 
   Future<void> _handleCheckOut() async {
+    debugPrint(
+      '🔍 _handleCheckOut called. Current _reportedIssues: ${_reportedIssues.length}',
+    );
+    debugPrint('   Current _maintenanceJobIds: $_maintenanceJobIds');
+
     if (_selectedVehicle == null) {
       ScaffoldMessenger.of(
         context,
@@ -549,13 +587,29 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       });
 
       // 3. Create maintenance jobs for items marked as "Issue"
+      debugPrint(
+        '📋 Checked inspection checklist: ${cleanedChecklist.length} items',
+      );
+      debugPrint('⚠️ Issue items found: ${issueItems.length}');
+      if (issueItems.isNotEmpty) {
+        debugPrint('Issue items: $issueItems');
+      }
+
       if (issueItems.isNotEmpty) {
         debugPrint(
           '⚠️ Creating maintenance jobs for ${issueItems.length} issues...',
         );
 
+        // NOTE: Inspection checklist issues do NOT get photos attached
+        // Only MANUAL issues (added via "Add Issue" button) have specific photos
+        // Attaching random inventory photos to inspection items causes confusion
+
         for (var issueLabel in issueItems) {
           try {
+            debugPrint('📝 Creating maintenance job for: $issueLabel');
+            debugPrint('   Vehicle ID: ${_selectedVehicle!.id}');
+            debugPrint('   ℹ️ No photo attached (inspection checklist item)');
+
             await provider.addIssue(
               ReportedIssue(
                 id:
@@ -563,44 +617,56 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                     '_' +
                     issueLabel.hashCode.toString(),
                 vehicleId: _selectedVehicle!.id,
-                type: 'Inspection Issue',
+                type:
+                    issueLabel, // Use specific issue type instead of generic "Inspection Issue"
                 description:
                     'Issue detected during check-out inspection: $issueLabel',
                 timestamp: DateTime.now(),
+                photoPath: null, // NO photo for inspection checklist items
               ),
             );
 
-            debugPrint('✅ Created maintenance job for: $issueLabel');
+            debugPrint(
+              '✅ Created maintenance job for: $issueLabel (no photo - checklist item)',
+            );
           } catch (e) {
             debugPrint(
-              'Warning: Could not create maintenance job for $issueLabel: $e',
+              '❌ Could not create maintenance job for $issueLabel: $e',
             );
             // Continue with other issues even if one fails
           }
         }
+      } else {
+        debugPrint('ℹ️ No issues marked - all items checked as OK');
+      }
 
-        // Show notification to user about issues reported
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${issueItems.length} issue(s) reported to admin'),
-              backgroundColor: AppTheme.warningOrange,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
+      // Show notification to user about issues reported
+      if (issueItems.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${issueItems.length} issue(s) reported to admin'),
+            backgroundColor: AppTheme.warningOrange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
 
       // 4. Save inventory photos to Supabase Storage and database
+      // Collect URLs to save in inventory record
+      final Map<String, String> uploadedPhotoUrls = {};
+
       debugPrint('📸 Saving ${_inventoryPhotos.length} inventory photos...');
       for (var entry in _inventoryPhotos.entries) {
         if (entry.value != null) {
           try {
-            await provider.setInventoryPhoto(
+            final photoUrl = await provider.setInventoryPhoto(
               _selectedVehicle!.id,
               entry.key,
               entry.value!,
             );
+            if (photoUrl != null) {
+              uploadedPhotoUrls[entry.key] = photoUrl;
+            }
           } catch (e) {
             debugPrint('Warning: Could not save photo ${entry.key}: $e');
           }
@@ -611,15 +677,22 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       debugPrint('📸 Saving ${_additionalPhotos.length} additional photos...');
       for (int i = 0; i < _additionalPhotos.length; i++) {
         try {
-          await provider.setInventoryPhoto(
+          final photoUrl = await provider.setInventoryPhoto(
             _selectedVehicle!.id,
             'additional_photo_$i',
             _additionalPhotos[i],
           );
+          if (photoUrl != null) {
+            uploadedPhotoUrls['additional_photo_$i'] = photoUrl;
+          }
         } catch (e) {
           debugPrint('Warning: Could not save additional photo $i: $e');
         }
       }
+
+      debugPrint(
+        '📸 Collected ${uploadedPhotoUrls.length} photo URLs for inventory record',
+      );
 
       // 5. Update vehicle data in database - THIS MUST COMPLETE SUCCESSFULLY
       debugPrint('💾 Updating vehicle data in database...');
@@ -630,7 +703,13 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       cleanedChecklist['ride_purpose'] = _ridePurpose;
 
       try {
-        await provider.updateVehicleSummary(_selectedVehicle!.id, {
+        // Parse odometer to integer for the dedicated column
+        final odometerText = _odometerController.text.trim();
+        final odometerValue = int.tryParse(
+          odometerText.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+
+        final updateData = <String, dynamic>{
           'is_vehicle_in': false,
           'status': issueItems.isNotEmpty
               ? 'maintenance'
@@ -648,7 +727,17 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               issueItems.isNotEmpty, // Flag for attention if issues found
           'last_check_out_time': DateTime.now()
               .toIso8601String(), // Track check-out time
-        });
+        };
+
+        // Add odometer to dedicated column if provided
+        if (odometerValue != null && odometerValue > 0) {
+          updateData['latest_odometer_reading'] = odometerValue;
+          debugPrint(
+            '📊 Updating latest_odometer_reading to: $odometerValue km',
+          );
+        }
+
+        await provider.updateVehicleSummary(_selectedVehicle!.id, updateData);
         debugPrint('✅ Vehicle data saved to database successfully');
       } catch (e) {
         debugPrint('❌ CRITICAL: Failed to save vehicle data to database: $e');
@@ -683,6 +772,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           debugPrint('Warning: Could not mark driver attendance: $e');
           // Continue with check-out even if attendance marking fails
         }
+      }
+
+      // 6.5 Deactivate driver remarks in service_remarks table (no longer visible on garage card)
+      try {
+        debugPrint('🔄 Deactivating driver remarks for checked-out vehicle...');
+        await SupabaseService().deactivateDriverRemarks(_selectedVehicle!.id);
+        debugPrint('✅ Driver remarks deactivated');
+      } catch (e) {
+        debugPrint('⚠️ Warning: Could not deactivate driver remarks: $e');
+        // Continue with check-out even if deactivation fails
       }
 
       // 7. Log activity - ensure vehicleNumber is not null/empty
@@ -739,6 +838,149 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         // The vehicle data is already saved
       }
 
+      // 7.5 Save comprehensive inventory record to mobile_inventory_records table
+      // This record will contain ALL data for this inventory session including issues with photos
+      try {
+        debugPrint(
+          '📋 Saving inventory_out record to mobile_inventory_records...',
+        );
+
+        final odometerText = _odometerController.text.trim();
+        final odometerValue = int.tryParse(
+          odometerText.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+
+        // Upload manual issue photos and get the URLs
+        // These are issues added via "Add Issue" button during this session
+        debugPrint(
+          '🔍 _reportedIssues count before upload: ${_reportedIssues.length}',
+        );
+        for (var i = 0; i < _reportedIssues.length; i++) {
+          debugPrint('   Issue $i: ${_reportedIssues[i]}');
+        }
+
+        // Get manual issues directly from provider (stored when AddIssue was called)
+        // This is the SIMPLEST and MOST RELIABLE approach:
+        // - addIssue() stores complete issue data (type, description, photoUrl) in provider
+        // - We use that data directly here - no need to query mobile_maintenance_jobs
+        final sessionIssues = provider.currentSessionIssues;
+        debugPrint('🔍 Session issues from provider: ${sessionIssues.length}');
+        for (var issue in sessionIssues) {
+          debugPrint('   → ${issue['type']}: photoUrl=${issue['photoUrl']}');
+        }
+
+        // Convert to the format expected by manual_issues field
+        List<Map<String, dynamic>> manualIssuesWithPhotos = sessionIssues
+            .map(
+              (issue) => {
+                'type': issue['type']?.toString() ?? 'Issue',
+                'description': issue['description']?.toString() ?? '',
+                'photoUrl': issue['photoUrl']?.toString(),
+                'videoUrl': issue['videoUrl']?.toString(),
+              },
+            )
+            .toList();
+
+        // Get job IDs for linking
+        List<String> jobIdsToLink = sessionIssues
+            .where((issue) => issue['jobId'] != null)
+            .map((issue) => issue['jobId'].toString())
+            .toList();
+
+        debugPrint(
+          '📋 Final manualIssuesWithPhotos: ${manualIssuesWithPhotos.length}',
+        );
+        for (var issue in manualIssuesWithPhotos) {
+          debugPrint('   → ${issue['type']}: photoUrl=${issue['photoUrl']}');
+        }
+
+        final inventoryRecord = {
+          'vehicle_id': _selectedVehicle!.id,
+          'registration_number': _selectedVehicle!.vehicleNumber,
+          'inventory_type':
+              'inventory_out', // 'inventory_in' or 'inventory_out'
+          'check_date': DateTime.now().toIso8601String(),
+          'staff_name': provider.userName ?? provider.userEmail ?? 'Unknown',
+          'hub_name': provider.selectedHub ?? 'Unknown',
+
+          // Charging Info
+          'charging_type': _selectedChargingType?.toUpperCase() ?? 'AC',
+
+          // Odometer
+          'odometer_reading': odometerValue,
+
+          // Driver Info
+          'driver_id': _selectedDriver?.id,
+          'driver_name': _selectedDriver?.name,
+          'ride_purpose': _ridePurpose,
+
+          // Inspection & Condition
+          'inspection_checklist': cleanedChecklist,
+          'interior_clean': _isInteriorClean,
+
+          // Issues - ALL issue data stored directly in this record
+          'issues_count': issueItems.length + manualIssuesWithPhotos.length,
+          'issue_items':
+              issueItems, // Inspection checklist issues (no photos) - legacy field
+          // New issue columns
+          'checklist_issues':
+              issueItems, // TEXT[] - inspection items marked as Issue
+          'checklist_issues_count': issueItems.length,
+          'manual_issues':
+              manualIssuesWithPhotos, // JSONB - manual issues with photo URLs
+          'manual_issues_count': manualIssuesWithPhotos.length,
+          'has_issues':
+              issueItems.isNotEmpty || manualIssuesWithPhotos.isNotEmpty,
+
+          // Photos - save URLs as Map (category -> URL) for admin panel to use
+          'photos_count': uploadedPhotoUrls.length,
+          'photo_categories': uploadedPhotoUrls, // Map of category -> URL
+          'additional_photos_count': uploadedPhotoUrls.keys
+              .where((k) => k.startsWith('additional_photo_'))
+              .length,
+
+          // Metadata
+          'created_at': DateTime.now().toIso8601String(),
+          'app_version': '1.0.0',
+        };
+
+        final createdRecord = await SupabaseService().createInventoryRecord(
+          inventoryRecord,
+        );
+        final inventoryRecordId = createdRecord['id']?.toString();
+
+        debugPrint('✅ Inventory_out record saved to mobile_inventory_records');
+        debugPrint('   - Record ID: $inventoryRecordId');
+        debugPrint('   - Checklist issues: ${issueItems.length} → $issueItems');
+        debugPrint(
+          '   - Manual issues with photos: ${manualIssuesWithPhotos.length}',
+        );
+        for (var issue in manualIssuesWithPhotos) {
+          debugPrint('     → ${issue['type']}: photoUrl=${issue['photoUrl']}');
+        }
+        debugPrint('   - Inventory photos: ${uploadedPhotoUrls.length}');
+
+        // Link maintenance jobs to this inventory record
+        // Use jobIdsToLink which was populated during issue processing
+        if (inventoryRecordId != null && jobIdsToLink.isNotEmpty) {
+          debugPrint(
+            '🔗 Linking ${jobIdsToLink.length} maintenance jobs to inventory record...',
+          );
+          debugPrint('   Job IDs to link: $jobIdsToLink');
+          await SupabaseService().linkJobsToInventoryRecord(
+            jobIdsToLink,
+            inventoryRecordId,
+          );
+          debugPrint('✅ Maintenance jobs linked to inventory record');
+        }
+
+        // Clear session data (job IDs and issues) after successful checkout
+        provider.clearSessionData();
+      } catch (e) {
+        debugPrint('⚠️ Warning: Could not save inventory record: $e');
+        // Continue even if inventory record save fails - vehicle data is already saved
+      }
+
       // 8. Show success immediately and navigate back
       debugPrint('✅ Check-out completed successfully - all data saved');
       if (issueItems.isNotEmpty) {
@@ -755,19 +997,25 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           ),
         );
         context.pop();
-        
+
         // Refresh data in background (don't await - let it run asynchronously)
         debugPrint('🔄 Refreshing vehicles and activities in background...');
-        provider.loadVehicles(forceRefresh: true).then((_) {
-          debugPrint('✅ Vehicles refreshed');
-        }).catchError((e) {
-          debugPrint('⚠️ Background refresh failed: $e');
-        });
-        provider.loadActivities(limit: 20).then((_) {
-          debugPrint('✅ Activities refreshed');
-        }).catchError((e) {
-          debugPrint('⚠️ Background activity refresh failed: $e');
-        });
+        provider
+            .loadVehicles(forceRefresh: true)
+            .then((_) {
+              debugPrint('✅ Vehicles refreshed');
+            })
+            .catchError((e) {
+              debugPrint('⚠️ Background refresh failed: $e');
+            });
+        provider
+            .loadActivities(limit: 20)
+            .then((_) {
+              debugPrint('✅ Activities refreshed');
+            })
+            .catchError((e) {
+              debugPrint('⚠️ Background activity refresh failed: $e');
+            });
       }
     } catch (e) {
       debugPrint('❌ Error during check-out: $e');
@@ -828,6 +1076,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                       prefixIcon: const Icon(
                         LucideIcons.search,
                         color: Color(0xFF9CA3AF),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(
+                          LucideIcons.camera,
+                          color: AppTheme.primaryBlue,
+                        ),
+                        onPressed: () {
+                          // Allow re-launching the scanner manualy
+                          setState(() {
+                            _hasLaunchedScanner = false;
+                          });
+                          _launchPlateScanner();
+                        },
                       ),
                       filled: true,
                       fillColor: Theme.of(context).brightness == Brightness.dark
@@ -1343,9 +1604,19 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildPurposeButton('Periodic Service', LucideIcons.wrench)),
+            Expanded(
+              child: _buildPurposeButton(
+                'Periodic Service',
+                LucideIcons.wrench,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildPurposeButton('Station Shifting', LucideIcons.refreshCw)),
+            Expanded(
+              child: _buildPurposeButton(
+                'Station Shifting',
+                LucideIcons.refreshCw,
+              ),
+            ),
           ],
         ),
       ],
@@ -1414,46 +1685,43 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
     final showWarning = type == 'dc' && _consecutiveDCCharges >= 3;
 
     return InkWell(
-      onTap:
-          isDCBlocked
-              ? () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'DC Charging is blocked. Please use AC charging to balance the battery!',
-                    ),
-                    backgroundColor: Colors.red,
+      onTap: isDCBlocked
+          ? () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'DC Charging is blocked. Please use AC charging to balance the battery!',
                   ),
-                );
-              }
-              : () {
-                setState(() {
-                  _selectedChargingType = type;
-                });
-              },
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          : () {
+              setState(() {
+                _selectedChargingType = type;
+              });
+            },
       child: Opacity(
         opacity: isDCBlocked ? 0.6 : 1.0,
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color:
-                isDCBlocked
-                    ? Colors.red.withOpacity(0.1)
-                    : showWarning
-                    ? Colors.orange.withOpacity(0.1)
-                    : isSelected
-                    ? AppTheme.primaryGreen.withOpacity(0.1)
-                    : Colors.white,
+            color: isDCBlocked
+                ? Colors.red.withOpacity(0.1)
+                : showWarning
+                ? Colors.orange.withOpacity(0.1)
+                : isSelected
+                ? AppTheme.primaryGreen.withOpacity(0.1)
+                : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color:
-                  isDCBlocked
-                      ? Colors.red
-                      : showWarning
-                      ? Colors.orange
-                      : isSelected
-                      ? AppTheme.primaryGreen
-                      : const Color(0xFFE5E7EB),
+              color: isDCBlocked
+                  ? Colors.red
+                  : showWarning
+                  ? Colors.orange
+                  : isSelected
+                  ? AppTheme.primaryGreen
+                  : const Color(0xFFE5E7EB),
               width: (isSelected || isDCBlocked || showWarning) ? 2 : 1,
             ),
           ),
@@ -1464,14 +1732,13 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 children: [
                   Icon(
                     isDCBlocked ? LucideIcons.ban : LucideIcons.zap,
-                    color:
-                        isDCBlocked
-                            ? Colors.red
-                            : showWarning
-                            ? Colors.orange
-                            : isSelected
-                            ? AppTheme.primaryGreen
-                            : const Color(0xFF6B7280),
+                    color: isDCBlocked
+                        ? Colors.red
+                        : showWarning
+                        ? Colors.orange
+                        : isSelected
+                        ? AppTheme.primaryGreen
+                        : const Color(0xFF6B7280),
                     size: 32,
                   ),
                   if (type == 'dc' && _consecutiveDCCharges > 0)
@@ -1484,12 +1751,11 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              _consecutiveDCCharges >= 5
-                                  ? Colors.red
-                                  : _consecutiveDCCharges >= 3
-                                  ? Colors.orange
-                                  : Colors.blue,
+                          color: _consecutiveDCCharges >= 5
+                              ? Colors.red
+                              : _consecutiveDCCharges >= 3
+                              ? Colors.orange
+                              : Colors.blue,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -1510,14 +1776,13 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color:
-                      isDCBlocked
-                          ? Colors.red
-                          : showWarning
-                          ? Colors.orange
-                          : isSelected
-                          ? AppTheme.primaryGreen
-                          : const Color(0xFF374151),
+                  color: isDCBlocked
+                      ? Colors.red
+                      : showWarning
+                      ? Colors.orange
+                      : isSelected
+                      ? AppTheme.primaryGreen
+                      : const Color(0xFF374151),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1574,18 +1839,16 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? (isClean
-                      ? AppTheme.primaryGreen.withOpacity(0.1)
-                      : AppTheme.dangerRed.withOpacity(0.1))
-                  : Colors.white,
+          color: isSelected
+              ? (isClean
+                    ? AppTheme.primaryGreen.withOpacity(0.1)
+                    : AppTheme.dangerRed.withOpacity(0.1))
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isSelected
-                    ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
-                    : const Color(0xFFE5E7EB),
+            color: isSelected
+                ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                : const Color(0xFFE5E7EB),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -1593,10 +1856,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           children: [
             Icon(
               isClean ? LucideIcons.sparkles : LucideIcons.trash2,
-              color:
-                  isSelected
-                      ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
-                      : const Color(0xFF6B7280),
+              color: isSelected
+                  ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                  : const Color(0xFF6B7280),
               size: 32,
             ),
             const SizedBox(height: 8),
@@ -1605,10 +1867,9 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color:
-                    isSelected
-                        ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
-                        : const Color(0xFF374151),
+                color: isSelected
+                    ? (isClean ? AppTheme.primaryGreen : AppTheme.dangerRed)
+                    : const Color(0xFF374151),
               ),
               textAlign: TextAlign.center,
             ),

@@ -48,11 +48,11 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
     if (response.file != null) {
       setState(() {
         if (response.type == RetrieveType.video) {
-           ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Recovered video: ${response.file!.name}')),
           );
         } else {
-           ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Recovered image: ${response.file!.name}')),
           );
         }
@@ -72,14 +72,22 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
         if (draftType != null) _typeController.text = draftType;
         if (draftDesc != null) _descController.text = draftDesc;
       });
-      debugPrint('AddIssueScreen: [DRAFT] Recovered draft for vehicle ${widget.vehicleId}');
+      debugPrint(
+        'AddIssueScreen: [DRAFT] Recovered draft for vehicle ${widget.vehicleId}',
+      );
     }
   }
 
   Future<void> _saveDraft() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('draft_type_${widget.vehicleId}', _typeController.text);
-    await prefs.setString('draft_desc_${widget.vehicleId}', _descController.text);
+    await prefs.setString(
+      'draft_type_${widget.vehicleId}',
+      _typeController.text,
+    );
+    await prefs.setString(
+      'draft_desc_${widget.vehicleId}',
+      _descController.text,
+    );
   }
 
   Future<void> _clearDraft() async {
@@ -122,7 +130,9 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
     } catch (e) {
       debugPrint('Error picking media: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error accessing ${isVideo ? 'video' : 'camera'}: $e')),
+        SnackBar(
+          content: Text('Error accessing ${isVideo ? 'video' : 'camera'}: $e'),
+        ),
       );
     }
   }
@@ -143,7 +153,7 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               Text(
                 'Source for ${isVideo ? 'Video' : 'Photo'}',
                 style: TextStyle(
-                  fontSize: 18, 
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).textTheme.titleLarge?.color,
                 ),
@@ -152,22 +162,14 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _sourceOption(
-                    'Camera',
-                    LucideIcons.camera,
-                    () {
-                      Navigator.pop(context);
-                      _pickMedia(isVideo, ImageSource.camera);
-                    },
-                  ),
-                  _sourceOption(
-                    'Gallery',
-                    LucideIcons.image,
-                    () {
-                      Navigator.pop(context);
-                      _pickMedia(isVideo, ImageSource.gallery);
-                    },
-                  ),
+                  _sourceOption('Camera', LucideIcons.camera, () {
+                    Navigator.pop(context);
+                    _pickMedia(isVideo, ImageSource.camera);
+                  }),
+                  _sourceOption('Gallery', LucideIcons.image, () {
+                    Navigator.pop(context);
+                    _pickMedia(isVideo, ImageSource.gallery);
+                  }),
                 ],
               ),
               const SizedBox(height: 10),
@@ -192,7 +194,13 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
             child: Icon(icon, color: AppTheme.primaryBlue, size: 30),
           ),
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(fontWeight: FontWeight.w500, color: Theme.of(context).textTheme.bodyLarge?.color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
         ],
       ),
     );
@@ -203,7 +211,10 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Add Issue', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Add Issue',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         leading: IconButton(
@@ -226,17 +237,20 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                   return const Iterable<String>.empty();
                 }
                 return options.where((String option) {
-                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                  return option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
                 });
               },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: (val) => _typeController.text = val,
-                  decoration: _inputDecoration('Select or type issue type'),
-                );
-              },
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onChanged: (val) => _typeController.text = val,
+                      decoration: _inputDecoration('Select or type issue type'),
+                    );
+                  },
               onSelected: (String selection) {
                 _typeController.text = selection;
               },
@@ -249,15 +263,18 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               maxLines: 5,
               maxLength: 500,
               style: const TextStyle(fontSize: 14),
-              decoration: _inputDecoration('Enter detailed description of the issue...')
-                  .copyWith(counterText: ''),
+              decoration: _inputDecoration(
+                'Enter detailed description of the issue...',
+              ).copyWith(counterText: ''),
             ),
             const SizedBox(height: 8),
             Text(
-              '$_charCount/500 characters', 
+              '$_charCount/500 characters',
               style: TextStyle(
-                fontSize: 12, 
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                fontSize: 12,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF6B7280),
               ),
             ),
             const SizedBox(height: 24),
@@ -265,9 +282,17 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                _uploadButton('Photo', LucideIcons.camera, () => _showSourcePicker(false)),
+                _uploadButton(
+                  'Photo',
+                  LucideIcons.camera,
+                  () => _showSourcePicker(false),
+                ),
                 const SizedBox(width: 24),
-                _uploadButton('Video', LucideIcons.video, () => _showSourcePicker(true)),
+                _uploadButton(
+                  'Video',
+                  LucideIcons.video,
+                  () => _showSourcePicker(true),
+                ),
               ],
             ),
             if (_capturedPhotoPath != null || _capturedVideoPath != null) ...[
@@ -281,15 +306,15 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                   children: [
                     if (_capturedPhotoPath != null)
                       _buildMediaThumbnail(
-                        File(_capturedPhotoPath!), 
-                        false, 
-                        () => setState(() => _capturedPhotoPath = null)
+                        File(_capturedPhotoPath!),
+                        false,
+                        () => setState(() => _capturedPhotoPath = null),
                       ),
                     if (_capturedVideoPath != null)
                       _buildMediaThumbnail(
-                        File(_capturedVideoPath!), 
-                        true, 
-                        () => setState(() => _capturedVideoPath = null)
+                        File(_capturedVideoPath!),
+                        true,
+                        () => setState(() => _capturedVideoPath = null),
                       ),
                   ],
                 ),
@@ -300,7 +325,9 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               width: double.infinity,
               height: 64,
               child: ElevatedButton(
-                onPressed: (_typeController.text.isNotEmpty && _descController.text.isNotEmpty)
+                onPressed:
+                    (_typeController.text.isNotEmpty &&
+                        _descController.text.isNotEmpty)
                     ? () async {
                         try {
                           // Show loading indicator
@@ -314,7 +341,10 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     ),
                                     SizedBox(width: 16),
@@ -326,18 +356,24 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                             );
                           }
 
-                          await context.read<AppProvider>().addIssue(ReportedIssue(
-                                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                vehicleId: widget.vehicleId,
-                                type: _typeController.text,
-                                description: _descController.text,
-                                timestamp: DateTime.now(),
-                                photoPath: _capturedPhotoPath,
-                                videoPath: _capturedVideoPath,
-                              ));
-                          
+                          // Get the uploaded URLs from addIssue
+                          final uploadedUrls = await context
+                              .read<AppProvider>()
+                              .addIssue(
+                                ReportedIssue(
+                                  id: DateTime.now().millisecondsSinceEpoch
+                                      .toString(),
+                                  vehicleId: widget.vehicleId,
+                                  type: _typeController.text,
+                                  description: _descController.text,
+                                  timestamp: DateTime.now(),
+                                  photoPath: _capturedPhotoPath,
+                                  videoPath: _capturedVideoPath,
+                                ),
+                              );
+
                           await _clearDraft();
-                          
+
                           if (mounted) {
                             ScaffoldMessenger.of(context).clearSnackBars();
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -346,21 +382,40 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                                 backgroundColor: AppTheme.successGreen,
                               ),
                             );
-                            debugPrint('AddIssueScreen: [REPORT] Back to details...');
-                            Navigator.of(context).pop({
+                            debugPrint(
+                              'AddIssueScreen: [REPORT] Back to check-out with URLs...',
+                            );
+                            debugPrint(
+                              '  photoUrl: ${uploadedUrls['photoUrl']}',
+                            );
+                            debugPrint(
+                              '  videoUrl: ${uploadedUrls['videoUrl']}',
+                            );
+                            debugPrint('  jobId: ${uploadedUrls['jobId']}');
+                            // Return issue data WITH the uploaded URLs and job ID
+                            // Use GoRouter's pop to return data properly
+                            context.pop({
                               'type': _typeController.text,
                               'description': _descController.text,
                               'photoPath': _capturedPhotoPath,
                               'videoPath': _capturedVideoPath,
+                              'photoUrl': uploadedUrls['photoUrl'],
+                              'videoUrl': uploadedUrls['videoUrl'],
+                              'jobId':
+                                  uploadedUrls['jobId'], // Include job ID for linking!
                             });
                           }
                         } catch (e) {
-                          debugPrint('AddIssueScreen: [ERROR] Failed to report issue: $e');
+                          debugPrint(
+                            'AddIssueScreen: [ERROR] Failed to report issue: $e',
+                          );
                           if (mounted) {
                             ScaffoldMessenger.of(context).clearSnackBars();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Failed to report issue: ${e.toString().replaceAll('Exception: ', '')}'),
+                                content: Text(
+                                  'Failed to report issue: ${e.toString().replaceAll('Exception: ', '')}',
+                                ),
                                 backgroundColor: AppTheme.dangerRed,
                                 duration: const Duration(seconds: 5),
                                 action: SnackBarAction(
@@ -380,7 +435,9 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                   backgroundColor: AppTheme.dangerRed,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: AppTheme.dangerRed.withOpacity(0.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   elevation: 0,
                 ),
                 child: const Row(
@@ -388,7 +445,13 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                   children: [
                     Icon(LucideIcons.alertTriangle, size: 24),
                     SizedBox(width: 12),
-                    Text('Report Issue', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Report Issue',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -403,8 +466,8 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 15, 
-        fontWeight: FontWeight.bold, 
+        fontSize: 15,
+        fontWeight: FontWeight.bold,
         color: Theme.of(context).textTheme.titleLarge?.color,
       ),
     );
@@ -420,11 +483,15 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB)),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB)),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -450,10 +517,10 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            label, 
+            label,
             style: TextStyle(
-              fontSize: 13, 
-              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563), 
+              fontSize: 13,
+              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -461,6 +528,7 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
       ),
     );
   }
+
   Widget _buildMediaThumbnail(File file, bool isVideo, VoidCallback onRemove) {
     return Container(
       margin: const EdgeInsets.only(right: 12),
@@ -480,8 +548,8 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
                     child: const Icon(LucideIcons.video, color: Colors.grey),
                   )
                 : kIsWeb
-                    ? Image.network(file.path, fit: BoxFit.cover)
-                    : Image.file(file, fit: BoxFit.cover),
+                ? Image.network(file.path, fit: BoxFit.cover)
+                : Image.file(file, fit: BoxFit.cover),
           ),
           Positioned(
             top: 4,
@@ -491,11 +559,19 @@ class _AddIssueScreenState extends State<AddIssueScreen> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF374151) : Colors.white,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF374151)
+                      : Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 4),
+                  ],
                 ),
-                child: const Icon(LucideIcons.x, size: 14, color: AppTheme.dangerRed),
+                child: const Icon(
+                  LucideIcons.x,
+                  size: 14,
+                  color: AppTheme.dangerRed,
+                ),
               ),
             ),
           ),

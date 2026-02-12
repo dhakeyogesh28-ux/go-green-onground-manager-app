@@ -1369,27 +1369,38 @@ class AppProvider with ChangeNotifier {
     String hub,
   ) async {
     try {
+      debugPrint('🔐 validateLogin called:');
+      debugPrint('   Email: $email');
+      debugPrint('   Selected Hub: $hub');
+
       final user = await _supabaseService.authenticateUser(email, password);
 
       if (user == null) {
-        debugPrint('Login failed: Invalid credentials');
+        debugPrint('❌ Login failed: Invalid credentials or user not found');
         return null;
       }
 
-      // Check if hub matches
-      if (user['hub'] != hub) {
-        debugPrint(
-          'Login failed: Hub mismatch. Expected $hub, got ${user['hub']}',
-        );
+      // Check if hub matches (case-sensitive comparison!)
+      final dbHub = user['hub']?.toString() ?? '';
+      debugPrint('📍 Comparing hubs:');
+      debugPrint('   DB Hub: "$dbHub"');
+      debugPrint('   Selected Hub: "$hub"');
+      debugPrint('   Match: ${dbHub == hub}');
+
+      if (dbHub != hub) {
+        debugPrint('❌ Login failed: Hub mismatch!');
+        debugPrint('   User\'s hub in database is "$dbHub"');
+        debugPrint('   But selected hub is "$hub"');
+        debugPrint('   These must match EXACTLY (case-sensitive)');
         return null;
       }
 
       debugPrint(
-        'Login validation successful for ${user['email']} at ${user['hub']}',
+        '✅ Login validation successful for ${user['email']} at ${user['hub']}',
       );
       return user;
     } catch (e) {
-      debugPrint('Login validation error: $e');
+      debugPrint('❌ Login validation error: $e');
       return null;
     }
   }

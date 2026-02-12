@@ -662,6 +662,31 @@ class SupabaseService {
     String password,
   ) async {
     try {
+      debugPrint('🔐 Attempting to authenticate: $email');
+
+      // First check if user exists at all (regardless of password)
+      final userCheck = await _client
+          .from('users')
+          .select('email, hub, is_active')
+          .eq('email', email)
+          .maybeSingle();
+
+      if (userCheck == null) {
+        debugPrint('❌ AUTH FAILED: No user found with email: $email');
+        debugPrint('   Please check if the user exists in the "users" table');
+        return null;
+      }
+
+      debugPrint('📧 User found: ${userCheck['email']}');
+      debugPrint('   Hub in DB: ${userCheck['hub']}');
+      debugPrint('   Is Active: ${userCheck['is_active']}');
+
+      if (userCheck['is_active'] != true) {
+        debugPrint('❌ AUTH FAILED: User is inactive (is_active = false)');
+        return null;
+      }
+
+      // Now check with password
       final response = await _client
           .from('users')
           .select('*')
@@ -671,14 +696,17 @@ class SupabaseService {
           .maybeSingle();
 
       if (response != null) {
-        debugPrint(
-          'User authenticated: ${response['email']} at ${response['hub']}',
-        );
+        debugPrint('✅ User authenticated successfully!');
+        debugPrint('   Email: ${response['email']}');
+        debugPrint('   Hub: ${response['hub']}');
+        debugPrint('   Full Name: ${response['full_name']}');
+      } else {
+        debugPrint('❌ AUTH FAILED: Password incorrect for user: $email');
       }
 
       return response;
     } catch (e) {
-      debugPrint('Error authenticating user: $e');
+      debugPrint('❌ Error authenticating user: $e');
       return null;
     }
   }

@@ -35,26 +35,27 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen>
 
   // Category-specific instructions
   Map<String, String> get _instructions => {
-    'exterior_front': 'Align the front of the vehicle within the frame',
-    'exterior_rear': 'Align the rear of the vehicle within the frame',
-    'exterior_left':
-        'Rotate your phone to landscape mode and capture the left side',
-    'exterior_right':
-        'Rotate your phone to landscape mode and capture the right side',
+    'ext_front': 'Align the front of the vehicle within the frame',
+    'ext_rear': 'Align the rear of the vehicle within the frame',
+    'ext_left_door': 'Rotate phone to landscape: Capture left front door',
+    'ext_left_backdoor': 'Rotate phone to landscape: Capture left rear door',
+    'ext_right_door': 'Rotate phone to landscape: Capture right front door',
+    'ext_right_backdoor': 'Rotate phone to landscape: Capture right rear door',
     'dents_scratches': 'Focus on any dents, scratches, or damage',
-    'interior_cabin': 'Capture the interior cabin',
-    'dikki_trunk': 'Capture the trunk/dikki interior',
-    'tool_kit': 'Capture the tool kit contents',
-    'valuables_check': 'Capture any valuables or important items',
-    'odometer': 'Capture a clear photo of the odometer',
-    'stepney_tyre': 'Capture the stepney tyre condition',
+    'interior_1': 'Capture the front interior',
+    'interior_2': 'Capture the rear interior',
+    'trunk': 'Capture the trunk/dikki interior',
+    'tools': 'Capture the tool kit contents',
+    'valuables': 'Capture any valuables or important items',
+    'odo': 'Capture a clear photo of the odometer',
+    'stepney': 'Capture the stepney tyre condition',
     'umbrella': 'Capture the umbrella (if present)',
     'battery': 'Capture the vehicle battery',
-    'engine_compartment': 'Capture the engine compartment area',
-    'corner_view_1': 'Capture front-left corner view',
-    'corner_view_2': 'Capture front-right corner view',
-    'corner_view_3': 'Capture rear-left corner view',
-    'corner_view_4': 'Capture rear-right corner view',
+    'engine': 'Capture the engine compartment area',
+    'corner_1': 'Capture front-left corner view',
+    'corner_2': 'Capture front-right corner view',
+    'corner_3': 'Capture rear-left corner view',
+    'corner_4': 'Capture rear-right corner view',
     'additional_photos': 'Capture any additional details',
   };
 
@@ -63,12 +64,12 @@ class _CameraOverlayScreenState extends State<CameraOverlayScreen>
       'Position the subject within the frame';
 
   bool get _shouldShowVehicleOutline {
-    return widget.categoryId.startsWith('exterior_');
+    return widget.categoryId.startsWith('ext_');
   }
 
   bool get _isLandscapeCategory {
-    return widget.categoryId == 'exterior_left' ||
-        widget.categoryId == 'exterior_right';
+    return widget.categoryId.startsWith('ext_left') ||
+        widget.categoryId.startsWith('ext_right');
   }
 
   @override
@@ -467,12 +468,12 @@ class VehicleOutlinePainter extends CustomPainter {
     // Check if portrait or landscape
     final isPortrait = size.height > size.width;
 
-    if (categoryId == 'exterior_front') {
+    if (categoryId == 'ext_front') {
       _drawFrontCar(canvas, size, paint, isPortrait);
-    } else if (categoryId == 'exterior_rear') {
+    } else if (categoryId == 'ext_rear') {
       _drawRearCar(canvas, size, paint, isPortrait);
-    } else if (categoryId == 'exterior_left' ||
-        categoryId == 'exterior_right') {
+    } else if (categoryId.startsWith('ext_left') ||
+        categoryId.startsWith('ext_right')) {
       _drawSideCar(canvas, size, paint, isPortrait);
     }
   }

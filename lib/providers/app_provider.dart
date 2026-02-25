@@ -61,6 +61,14 @@ class AppProvider with ChangeNotifier {
   String? _driversError;
   String? get driversError => _driversError;
 
+  // Shift management
+  bool _isShiftActive = false;
+  bool get isShiftActive => _isShiftActive;
+  DateTime? _shiftStartTime;
+  DateTime? get shiftStartTime => _shiftStartTime;
+  DateTime? _shiftEndTime;
+  DateTime? get shiftEndTime => _shiftEndTime;
+
   // Local data for offline support
   final List<ReportedIssue> _reportedIssues = [];
   final List<InspectionResult> _inspectionResults = [];
@@ -193,6 +201,35 @@ class AppProvider with ChangeNotifier {
           '   - Loaded ${_pendingOperations.length} pending operations from storage',
         );
       }
+
+      // Load shift data
+      _isShiftActive = prefs.getBool('isShiftActive') ?? false;
+      final shiftStartStr = prefs.getString('shiftStartTime');
+      if (shiftStartStr != null) {
+        _shiftStartTime = DateTime.tryParse(shiftStartStr);
+      }
+      final shiftEndStr = prefs.getString('shiftEndTime');
+      if (shiftEndStr != null) {
+        _shiftEndTime = DateTime.tryParse(shiftEndStr);
+      }
+      // Reset shift if it's from a previous day
+      if (_shiftStartTime != null) {
+        final now = DateTime.now();
+        if (_shiftStartTime!.year != now.year ||
+            _shiftStartTime!.month != now.month ||
+            _shiftStartTime!.day != now.day) {
+          _isShiftActive = false;
+          _shiftStartTime = null;
+          _shiftEndTime = null;
+          await prefs.remove('isShiftActive');
+          await prefs.remove('shiftStartTime');
+          await prefs.remove('shiftEndTime');
+          debugPrint('   - Shift data reset (from a previous day)');
+        }
+      }
+      debugPrint('   - isShiftActive: $_isShiftActive');
+      debugPrint('   - shiftStartTime: $_shiftStartTime');
+      debugPrint('   - shiftEndTime: $_shiftEndTime');
 
       debugPrint('✅ AppProvider: INITIALIZED. Total data loaded successfully');
 
@@ -1526,6 +1563,11 @@ class AppProvider with ChangeNotifier {
     _inventoryPhotos.clear();
     _pendingOperations.clear();
 
+    // Clear shift data
+    _isShiftActive = false;
+    _shiftStartTime = null;
+    _shiftEndTime = null;
+
     await prefs.remove('userEmail');
     await prefs.remove('selectedHub');
     await prefs.remove('userName');
@@ -1534,6 +1576,9 @@ class AppProvider with ChangeNotifier {
     await prefs.remove('inventoryPhotos');
     await prefs.remove('pendingOperations');
     await prefs.remove('lastRoute');
+    await prefs.remove('isShiftActive');
+    await prefs.remove('shiftStartTime');
+    await prefs.remove('shiftEndTime');
     _lastRoute = null;
 
     debugPrint(
@@ -1559,6 +1604,53 @@ class AppProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('languageCode', code);
     notifyListeners();
+  }
+
+  // ==================== SHIFT MANAGEMENT ====================
+
+  /// Start a new shift
+  Future<void> startShift() async {
+    final now = DateTime.now();
+    _isShiftActive = true;
+    _shiftStartTime = now;
+    _shiftEndTime = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isShiftActive', true);
+    await prefs.setString('shiftStartTime', now.toIso8601String());
+    await prefs.remove('shiftEndTime');
+
+    debugPrint('✅ AppProvider: Shift started at $now');
+    notifyListeners();
+  }
+
+  /// End the current shift
+  Future<void> endShift() async {
+    final now = DateTime.now();
+    _isShiftActive = false;
+    _shiftEndTime = now;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isShiftActive', false);
+    await prefs.setString('shiftEndTime', now.toIso8601String());
+
+    debugPrint('✅ AppProvider: Shift ended at $now');
+    notifyListeners();
+  }
+
+  /// Get formatted shift duration
+  String get shiftDuration {
+    if (_shiftStartTime == null) return '--';
+    final end = _isShiftActive
+        ? DateTime.now()
+        : (_shiftEndTime ?? DateTime.now());
+    final diff = end.difference(_shiftStartTime!);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '${minutes}m';
   }
 
   // ==================== CONSTANTS ====================

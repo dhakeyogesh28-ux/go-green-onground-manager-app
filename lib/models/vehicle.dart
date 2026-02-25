@@ -99,6 +99,9 @@ class Vehicle {
   DateTime? lastCheckInTime;
   DateTime? lastCheckOutTime;
 
+  // AC/DC Charging Counter
+  int acChargeCount; // Count of AC charges since last DC charge (0-6)
+
   // Database fields from crm_vehicles
   final String? registrationNumber;
   final String? make;
@@ -137,6 +140,7 @@ class Vehicle {
     this.servicingStatus,
     this.lastCheckInTime,
     this.lastCheckOutTime,
+    this.acChargeCount = 0,
     this.registrationNumber,
     this.make,
     this.model,
@@ -214,6 +218,7 @@ class Vehicle {
       servicingStatus: json['servicing_status']?.toString(),
       lastCheckInTime: json['last_check_in_time'] != null ? DateTime.tryParse(json['last_check_in_time'].toString()) : null,
       lastCheckOutTime: json['last_check_out_time'] != null ? DateTime.tryParse(json['last_check_out_time'].toString()) : null,
+      acChargeCount: int.tryParse(json['ac_charge_count']?.toString() ?? '0') ?? 0,
       registrationNumber: json['registration_number']?.toString(),
       make: json['make']?.toString(),
       model: json['model']?.toString(),
@@ -253,6 +258,7 @@ class Vehicle {
       'servicing_status': servicingStatus,
       'last_check_in_time': lastCheckInTime?.toIso8601String(),
       'last_check_out_time': lastCheckOutTime?.toIso8601String(),
+      'ac_charge_count': acChargeCount,
       'make': make,
       'model': model,
       'variant': variant,
@@ -311,6 +317,7 @@ class Vehicle {
     String? servicingStatus,
     DateTime? lastCheckInTime,
     DateTime? lastCheckOutTime,
+    int? acChargeCount,
     String? driverRemark,
     String? odometerReading,
     String? ridePurpose,
@@ -340,6 +347,7 @@ class Vehicle {
       servicingStatus: servicingStatus ?? this.servicingStatus,
       lastCheckInTime: lastCheckInTime ?? this.lastCheckInTime,
       lastCheckOutTime: lastCheckOutTime ?? this.lastCheckOutTime,
+      acChargeCount: acChargeCount ?? this.acChargeCount,
       registrationNumber: this.registrationNumber,
       make: this.make,
       model: this.model,

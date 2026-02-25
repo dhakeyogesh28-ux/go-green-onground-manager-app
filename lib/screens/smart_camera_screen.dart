@@ -64,7 +64,8 @@ class _SmartCameraScreenState extends State<SmartCameraScreen>
   }
 
   void _setOrientation() {
-    if (widget.categoryId == 'ext_left' || widget.categoryId == 'ext_right') {
+    if (widget.categoryId.startsWith('ext_left') ||
+        widget.categoryId.startsWith('ext_right')) {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
@@ -278,29 +279,34 @@ class _SmartCameraScreenState extends State<SmartCameraScreen>
   }
 
   static const Map<String, String> _guidelines = {
-    'ext_front':
-        'Align the front of the vehicle within the frame. Ensure headlights and grill are visible.',
-    'ext_rear':
-        'Align the rear of the vehicle within the frame. Ensure number plate and tail lights are visible.',
-    'ext_left':
-        'Capture the full left side of the vehicle. Keep the car centered.',
-    'ext_right':
-        'Capture the full right side of the vehicle. Keep the car centered.',
-    'dents':
-        'Get a close-up photo of the damaged area. Use good lighting for clarity.',
-    'interior':
-        'Capture the dashboard and front seats. Ensure the cabin is tidy.',
-    'dikki': 'Open the trunk and capture the interior space clearly.',
-    'tools': 'Show all tools clearly arranged in their case or the trunk.',
-    'valuables':
-        'Capture any personal items or valuable equipment left in the vehicle.',
+    'ext_front': 'Align the front of the vehicle within the frame.',
+    'ext_left_door': 'Capture the left front door.',
+    'ext_left_backdoor': 'Capture the left rear door.',
+    'ext_rear': 'Align the rear of the vehicle within the frame.',
+    'ext_right_backdoor': 'Capture the right rear door.',
+    'ext_right_door': 'Capture the right front door.',
+    'corner_1': 'Capture the first corner view.',
+    'corner_2': 'Capture the second corner view.',
+    'corner_3': 'Capture the third corner view.',
+    'corner_4': 'Capture the fourth corner view.',
+    'engine': 'Capture the engine compartment clearly.',
+    'trunk': 'Open the trunk and capture the interior space.',
+    'stepney': 'Capture the stepney tyre.',
+    'odo': 'Capture the odometer reading clearly.',
+    'interior_1': 'Capture the front interior view.',
+    'interior_2': 'Capture the rear interior view.',
+    'tools': 'Show all tools clearly arranged.',
+    'valuables': 'Capture any personal items or valuables.',
+    // Legacy maps mostly not needed but keeping simple defaults if hit
+    'dents': 'Get a close-up photo of the damaged area.',
   };
 
   Widget _buildOverlay() {
     final String guideline =
         _guidelines[widget.categoryId] ?? 'Align the object within the frame';
     final bool isLandscapeCategory =
-        widget.categoryId == 'ext_left' || widget.categoryId == 'ext_right';
+        widget.categoryId.startsWith('ext_left') ||
+        widget.categoryId.startsWith('ext_right');
 
     return Container(
       decoration: BoxDecoration(color: Colors.black.withOpacity(0.4)),
@@ -668,14 +674,21 @@ class SilhouettePainter extends CustomPainter {
         break;
       case 'ext_left':
       case 'ext_right':
+      case 'ext_left_door':
+      case 'ext_left_backdoor':
+      case 'ext_right_door':
+      case 'ext_right_backdoor':
         _drawSideCar(canvas, size, shadowPaint);
         _drawSideCar(canvas, size, paint);
         break;
       case 'interior':
+      case 'interior_1':
+      case 'interior_2':
         _drawDashboard(canvas, size, shadowPaint);
         _drawDashboard(canvas, size, paint);
         break;
       case 'dikki':
+      case 'trunk':
         _drawTrunk(canvas, size, shadowPaint);
         _drawTrunk(canvas, size, paint);
         break;

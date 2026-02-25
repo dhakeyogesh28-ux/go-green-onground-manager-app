@@ -194,6 +194,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   ),
+                  // Shift Management Section
+                  _buildShiftSection(context, provider),
                   // Overview Cards
                   Padding(
                     padding: const EdgeInsets.all(16),
@@ -597,6 +599,349 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildShiftSection(BuildContext context, AppProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    String _formatTime(DateTime? time) {
+      if (time == null) return '--:--';
+      final hour = time.hour > 12
+          ? time.hour - 12
+          : (time.hour == 0 ? 12 : time.hour);
+      final amPm = time.hour >= 12 ? 'PM' : 'AM';
+      return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $amPm';
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: provider.isShiftActive
+              ? AppTheme.primaryGreen.withOpacity(0.3)
+              : (isDark ? Colors.grey.shade700 : Colors.grey.shade200),
+          width: provider.isShiftActive ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: provider.isShiftActive
+                      ? AppTheme.primaryGreen.withOpacity(0.1)
+                      : (provider.shiftEndTime != null
+                            ? Colors.grey.withOpacity(0.1)
+                            : Colors.orange.withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  provider.isShiftActive
+                      ? LucideIcons.clock
+                      : (provider.shiftEndTime != null
+                            ? LucideIcons.checkCircle
+                            : LucideIcons.play),
+                  color: provider.isShiftActive
+                      ? AppTheme.primaryGreen
+                      : (provider.shiftEndTime != null
+                            ? Colors.grey
+                            : Colors.orange),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      provider.isShiftActive
+                          ? 'Shift In Progress'
+                          : (provider.shiftEndTime != null
+                                ? 'Shift Completed'
+                                : 'Shift Not Started'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                      ),
+                    ),
+                    if (provider.isShiftActive &&
+                        provider.shiftStartTime != null)
+                      Text(
+                        'Started at ${_formatTime(provider.shiftStartTime)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
+                        ),
+                      ),
+                    if (!provider.isShiftActive &&
+                        provider.shiftEndTime != null)
+                      Text(
+                        '${_formatTime(provider.shiftStartTime)} — ${_formatTime(provider.shiftEndTime)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Duration chip for active/completed shift
+              if (provider.shiftStartTime != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: provider.isShiftActive
+                        ? AppTheme.primaryGreen.withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.timer,
+                        size: 14,
+                        color: provider.isShiftActive
+                            ? AppTheme.primaryGreen
+                            : Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        provider.shiftDuration,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: provider.isShiftActive
+                              ? AppTheme.primaryGreen
+                              : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Action button
+          SizedBox(
+            width: double.infinity,
+            child: provider.isShiftActive
+                ? ElevatedButton.icon(
+                    onPressed: () =>
+                        _showEndShiftConfirmation(context, provider),
+                    icon: const Icon(LucideIcons.logOut, size: 18),
+                    label: const Text(
+                      'End Shift',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  )
+                : (provider.shiftEndTime != null
+                      ? ElevatedButton.icon(
+                          onPressed: () async {
+                            await provider.startShift();
+                          },
+                          icon: const Icon(LucideIcons.refreshCw, size: 18),
+                          label: const Text(
+                            'Start New Shift',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () async {
+                            await provider.startShift();
+                          },
+                          icon: const Icon(LucideIcons.play, size: 18),
+                          label: const Text(
+                            'Start Shift',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        )),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEndShiftConfirmation(BuildContext context, AppProvider provider) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  LucideIcons.alertCircle,
+                  color: Colors.red.shade600,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'End Shift',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to end your shift?',
+                style: TextStyle(fontSize: 15),
+              ),
+              const SizedBox(height: 12),
+              if (provider.shiftStartTime != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        LucideIcons.timer,
+                        size: 16,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Shift duration: ${provider.shiftDuration}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      await provider.endShift();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Yes',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 

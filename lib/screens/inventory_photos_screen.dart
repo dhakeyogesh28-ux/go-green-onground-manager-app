@@ -21,17 +21,38 @@ class InventoryPhotosScreen extends StatefulWidget {
 class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
   final ImagePicker _picker = ImagePicker();
   final List<String> _additionalPhotos = [];
-  
+
   final List<Map<String, String>> categories = [
     {'id': 'ext_front', 'label': 'Exterior: Front View', 'icon': 'car'},
+    {'id': 'ext_left_door', 'label': 'Exterior: Left View Door', 'icon': 'car'},
+    {
+      'id': 'ext_left_backdoor',
+      'label': 'Exterior: Left View Backdoor',
+      'icon': 'car',
+    },
     {'id': 'ext_rear', 'label': 'Exterior: Rear View', 'icon': 'car'},
-    {'id': 'ext_left', 'label': 'Exterior: Left Side', 'icon': 'car'},
-    {'id': 'ext_right', 'label': 'Exterior: Right Side', 'icon': 'car'},
-    {'id': 'dents', 'label': 'Dents & Scratches', 'icon': 'scan'},
-    {'id': 'interior', 'label': 'Interior / Cabin', 'icon': 'armchair'},
-    {'id': 'dikki', 'label': 'Dikki / Trunk', 'icon': 'shopping-bag'},
-    {'id': 'tools', 'label': 'Tool Kit', 'icon': 'wrench'},
-    {'id': 'valuables', 'label': 'Valuables Check', 'icon': 'briefcase'},
+    {
+      'id': 'ext_right_backdoor',
+      'label': 'Exterior: Right Back Door',
+      'icon': 'car',
+    },
+    {'id': 'ext_right_door', 'label': 'Exterior: Right Door', 'icon': 'car'},
+    {'id': 'corner_1', 'label': 'Corner View 1', 'icon': 'scan'},
+    {'id': 'corner_2', 'label': 'Corner View 2', 'icon': 'scan'},
+    {'id': 'corner_3', 'label': 'Corner View 3', 'icon': 'scan'},
+    {'id': 'corner_4', 'label': 'Corner View 4', 'icon': 'scan'},
+    {
+      'id': 'engine',
+      'label': 'Engine Compartment',
+      'icon': 'settings',
+    }, // using settings as engine/gear proxy if wrench is taken or just generic
+    {'id': 'trunk', 'label': 'Trunk Photo', 'icon': 'shopping-bag'},
+    {'id': 'stepney', 'label': 'Stepney Tyre', 'icon': 'disc'},
+    {'id': 'odo', 'label': 'ODO Photo', 'icon': 'gauge'},
+    {'id': 'interior_1', 'label': 'Interior 1', 'icon': 'armchair'},
+    {'id': 'interior_2', 'label': 'Interior 2', 'icon': 'armchair'},
+    {'id': 'tools', 'label': 'Toolkit', 'icon': 'wrench'},
+    {'id': 'valuables', 'label': 'Valuables', 'icon': 'briefcase'},
   ];
 
   @override
@@ -48,11 +69,13 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
   Future<void> _capture(int index) async {
     if (index >= categories.length) return;
     final category = categories[index];
-    
+
     // Prepare existing photos for the filmstrip
-    final photosMap = context.read<AppProvider>().getInventoryPhotos(widget.vehicleId);
+    final photosMap = context.read<AppProvider>().getInventoryPhotos(
+      widget.vehicleId,
+    );
     final List<Map<String, dynamic>> existingPhotos = [];
-    
+
     for (var cat in categories) {
       if (photosMap.containsKey(cat['id'])) {
         existingPhotos.add({
@@ -73,10 +96,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
           ),
         ),
       );
-      
+
       if (path != null) {
         if (!mounted) return;
-        
+
         // Show loading snackbar
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -84,12 +107,12 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-        
+
         // Save photo
         await context.read<AppProvider>().setInventoryPhoto(
-          widget.vehicleId, 
-          category['id']!, 
-          path
+          widget.vehicleId,
+          category['id']!,
+          path,
         );
 
         // Auto move to next photo if available
@@ -110,9 +133,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
     } catch (e) {
       debugPrint('Error capturing photo: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -122,7 +145,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Photo?'),
-        content: Text('Are you sure you want to remove the photo for ${category['label']}?'),
+        content: Text(
+          'Are you sure you want to remove the photo for ${category['label']}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -130,7 +155,13 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: AppTheme.dangerRed,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -138,7 +169,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
 
     if (confirm == true) {
       if (!mounted) return;
-      await context.read<AppProvider>().removeInventoryPhoto(widget.vehicleId, category['id']!);
+      await context.read<AppProvider>().removeInventoryPhoto(
+        widget.vehicleId,
+        category['id']!,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Photo removed for ${category['label']}')),
@@ -169,7 +203,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                   color: AppTheme.primaryBlue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(LucideIcons.camera, color: AppTheme.primaryBlue),
+                child: const Icon(
+                  LucideIcons.camera,
+                  color: AppTheme.primaryBlue,
+                ),
               ),
               title: const Text('Take Photo'),
               subtitle: const Text('Use camera to capture'),
@@ -186,7 +223,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                   color: AppTheme.successGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(LucideIcons.image, color: AppTheme.successGreen),
+                child: const Icon(
+                  LucideIcons.image,
+                  color: AppTheme.successGreen,
+                ),
               ),
               title: const Text('Choose from Gallery'),
               subtitle: const Text('Select multiple photos'),
@@ -208,12 +248,12 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      
+
       if (photo != null) {
         setState(() {
           _additionalPhotos.add(photo.path);
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -226,24 +266,22 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
     } catch (e) {
       debugPrint('Error capturing additional photo: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   Future<void> _pickFromGallery() async {
     try {
-      final List<XFile> photos = await _picker.pickMultiImage(
-        imageQuality: 85,
-      );
-      
+      final List<XFile> photos = await _picker.pickMultiImage(imageQuality: 85);
+
       if (photos.isNotEmpty) {
         setState(() {
           _additionalPhotos.addAll(photos.map((p) => p.path));
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -256,9 +294,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
     } catch (e) {
       debugPrint('Error picking from gallery: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -268,7 +306,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Photo?'),
-        content: const Text('Are you sure you want to remove this additional photo?'),
+        content: const Text(
+          'Are you sure you want to remove this additional photo?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -276,7 +316,13 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: AppTheme.dangerRed,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -287,30 +333,43 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
         _additionalPhotos.removeAt(index);
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo removed')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Photo removed')));
       }
     }
   }
 
   bool get _isAllDone {
-    final photos = context.watch<AppProvider>().getInventoryPhotos(widget.vehicleId);
+    final photos = context.watch<AppProvider>().getInventoryPhotos(
+      widget.vehicleId,
+    );
     return categories.every((cat) => photos.containsKey(cat['id']));
   }
 
   @override
   Widget build(BuildContext context) {
-    final photos = context.watch<AppProvider>().getInventoryPhotos(widget.vehicleId);
-    
+    final photos = context.watch<AppProvider>().getInventoryPhotos(
+      widget.vehicleId,
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Inventory Photos', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.titleLarge?.color)),
+        title: Text(
+          'Inventory Photos',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).textTheme.titleLarge?.color,
+          ),
+        ),
         backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(LucideIcons.chevronLeft, color: Theme.of(context).textTheme.bodyLarge?.color),
+          icon: Icon(
+            LucideIcons.chevronLeft,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
@@ -321,21 +380,31 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
             color: Theme.of(context).cardColor,
             child: Row(
               children: [
-                const Icon(LucideIcons.info, color: AppTheme.primaryBlue, size: 20),
+                const Icon(
+                  LucideIcons.info,
+                  color: AppTheme.primaryBlue,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'All 9 photos are compulsory for this report.',
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                        'All ${categories.length} photos are compulsory for this report.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       if (photos.length < categories.length)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: TextButton.icon(
-                            onPressed: () => _capture(photos.length), // Start from first missing
+                            onPressed: () => _capture(
+                              photos.length,
+                            ), // Start from first missing
                             icon: const Icon(LucideIcons.play, size: 16),
                             label: const Text('Start Capture Flow'),
                             style: TextButton.styleFrom(
@@ -351,7 +420,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                 ),
                 Text(
                   '${photos.length}/${categories.length}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryBlue,
+                  ),
                 ),
               ],
             ),
@@ -386,7 +458,7 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
 
   Widget _buildPhotoCard(int index, Map<String, String> cat, String? path) {
     final bool hasPhoto = path != null;
-    
+
     return InkWell(
       onTap: () => _capture(index),
       borderRadius: BorderRadius.circular(16),
@@ -395,7 +467,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: hasPhoto ? AppTheme.successGreen : Theme.of(context).dividerColor,
+            color: hasPhoto
+                ? AppTheme.successGreen
+                : Theme.of(context).dividerColor,
             width: 2,
           ),
           boxShadow: [
@@ -403,7 +477,7 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
               color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: ClipRRect(
@@ -412,9 +486,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
             fit: StackFit.expand,
             children: [
               if (hasPhoto)
-                kIsWeb 
-                  ? Image.network(path, fit: BoxFit.cover)
-                  : Image.file(File(path), fit: BoxFit.cover)
+                kIsWeb
+                    ? Image.network(path, fit: BoxFit.cover)
+                    : Image.file(File(path), fit: BoxFit.cover)
               else
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -425,7 +499,11 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                         color: AppTheme.primaryBlue.withOpacity(0.05),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(_getIcon(cat['icon']!), color: AppTheme.primaryBlue, size: 28),
+                      child: Icon(
+                        _getIcon(cat['icon']!),
+                        color: AppTheme.primaryBlue,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Padding(
@@ -434,9 +512,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                         cat['label']!,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 12, 
-                          fontWeight: FontWeight.bold, 
-                          color: Theme.of(context).textTheme.titleMedium?.color
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.titleMedium?.color,
                         ),
                       ),
                     ),
@@ -454,10 +532,18 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
-                      child: const Icon(LucideIcons.trash2, color: AppTheme.dangerRed, size: 14),
+                      child: const Icon(
+                        LucideIcons.trash2,
+                        color: AppTheme.dangerRed,
+                        size: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -467,8 +553,15 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                   right: 8,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: AppTheme.successGreen, shape: BoxShape.circle),
-                    child: const Icon(LucideIcons.check, color: Colors.white, size: 12),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.successGreen,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      LucideIcons.check,
+                      color: Colors.white,
+                      size: 12,
+                    ),
                   ),
                 ),
               Positioned(
@@ -477,14 +570,18 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                 right: 0,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  color: (hasPhoto ? AppTheme.successGreen : AppTheme.primaryBlue).withOpacity(0.1),
+                  color:
+                      (hasPhoto ? AppTheme.successGreen : AppTheme.primaryBlue)
+                          .withOpacity(0.1),
                   child: Text(
                     hasPhoto ? 'Retake' : 'Capture',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 11, 
-                      fontWeight: FontWeight.bold, 
-                      color: hasPhoto ? AppTheme.successGreen : AppTheme.primaryBlue
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: hasPhoto
+                          ? AppTheme.successGreen
+                          : AppTheme.primaryBlue,
                     ),
                   ),
                 ),
@@ -498,8 +595,8 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
 
   Widget _buildAdditionalPhotosCard() {
     return InkWell(
-      onTap: _additionalPhotos.isEmpty 
-          ? _showAdditionalPhotoOptions 
+      onTap: _additionalPhotos.isEmpty
+          ? _showAdditionalPhotoOptions
           : _showAdditionalPhotosDialog,
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -507,7 +604,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _additionalPhotos.isNotEmpty ? AppTheme.warningOrange : Theme.of(context).dividerColor,
+            color: _additionalPhotos.isNotEmpty
+                ? AppTheme.warningOrange
+                : Theme.of(context).dividerColor,
             width: 2,
           ),
           boxShadow: [
@@ -515,7 +614,7 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
               color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: ClipRRect(
@@ -532,7 +631,11 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                       color: AppTheme.warningOrange.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(LucideIcons.image, color: AppTheme.warningOrange, size: 28),
+                    child: const Icon(
+                      LucideIcons.image,
+                      color: AppTheme.warningOrange,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Padding(
@@ -541,9 +644,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                       'Additional Photos',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 12, 
-                        fontWeight: FontWeight.bold, 
-                        color: Theme.of(context).textTheme.titleMedium?.color
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.titleMedium?.color,
                       ),
                     ),
                   ),
@@ -552,7 +655,11 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         '${_additionalPhotos.length} photo(s)',
-                        style: const TextStyle(fontSize: 10, color: AppTheme.warningOrange, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.warningOrange,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                 ],
@@ -562,14 +669,21 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                   top: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.warningOrange,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${_additionalPhotos.length}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -584,9 +698,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                     _additionalPhotos.isEmpty ? 'Add Photos' : 'View All',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 11, 
-                      fontWeight: FontWeight.bold, 
-                      color: AppTheme.warningOrange
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.warningOrange,
                     ),
                   ),
                 ),
@@ -614,7 +728,10 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
                   children: [
                     const Text(
                       'Additional Photos',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -699,17 +816,19 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
 
   Widget _buildBottomAction() {
     final bool done = _isAllDone;
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05),
+            color: Colors.black.withOpacity(
+              Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05,
+            ),
             blurRadius: 10,
             offset: const Offset(0, -5),
-          )
+          ),
         ],
       ),
       child: SafeArea(
@@ -722,7 +841,9 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
               backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
               disabledBackgroundColor: Colors.grey.shade300,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 0,
             ),
             child: Text(
@@ -737,13 +858,26 @@ class _InventoryPhotosScreenState extends State<InventoryPhotosScreen> {
 
   IconData _getIcon(String iconName) {
     switch (iconName) {
-      case 'car': return LucideIcons.car;
-      case 'scan': return LucideIcons.scan;
-      case 'armchair': return LucideIcons.armchair;
-      case 'shopping-bag': return LucideIcons.shoppingBag;
-      case 'wrench': return LucideIcons.wrench;
-      case 'briefcase': return LucideIcons.briefcase;
-      default: return LucideIcons.camera;
+      case 'car':
+        return LucideIcons.car;
+      case 'scan':
+        return LucideIcons.scan;
+      case 'armchair':
+        return LucideIcons.armchair;
+      case 'shopping-bag':
+        return LucideIcons.shoppingBag;
+      case 'wrench':
+        return LucideIcons.wrench;
+      case 'briefcase':
+        return LucideIcons.briefcase;
+      case 'settings':
+        return LucideIcons.settings;
+      case 'disc':
+        return LucideIcons.disc;
+      case 'gauge':
+        return LucideIcons.gauge;
+      default:
+        return LucideIcons.camera;
     }
   }
 }

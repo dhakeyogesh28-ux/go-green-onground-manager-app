@@ -36,8 +36,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
   String? _ridePurpose; // 'B2B' or 'B2C'
   String? _selectedChargingType;
   double _batteryPercentage = 50.0;
-  int _consecutiveDCCharges = 0;
-  bool _dcChargingBlocked = false;
+  int _acChargeCount = 0; // Count of AC charges since last DC charge
+  bool _acChargingBlocked = false; // Block AC charging after 6 AC charges
   // Changed to tri-state: null = unchecked, true = OK, false = Issue
   final Map<String, bool?> _inspectionChecklist = {};
   final Map<String, String?> _inventoryPhotos = {};
@@ -51,75 +51,47 @@ class _CheckInScreenState extends State<CheckInScreen> {
   // Inventory photo categories
   final List<Map<String, dynamic>> _photoCategories = [
     {
-      'id': 'exterior_front',
+      'id': 'ext_front',
       'label': 'Exterior: Front View',
       'icon': LucideIcons.car,
     },
     {
-      'id': 'exterior_rear',
-      'label': 'Exterior: Rear View',
+      'id': 'ext_left_door',
+      'label': 'Exterior: Left View Door',
       'icon': LucideIcons.car,
     },
     {
-      'id': 'exterior_left',
-      'label': 'Exterior: Left Side',
+      'id': 'ext_left_backdoor',
+      'label': 'Exterior: Left View Backdoor',
+      'icon': LucideIcons.car,
+    },
+    {'id': 'ext_rear', 'label': 'Exterior: Rear View', 'icon': LucideIcons.car},
+    {
+      'id': 'ext_right_backdoor',
+      'label': 'Exterior: Right Back Door',
       'icon': LucideIcons.car,
     },
     {
-      'id': 'exterior_right',
-      'label': 'Exterior: Right Side',
+      'id': 'ext_right_door',
+      'label': 'Exterior: Right Door',
       'icon': LucideIcons.car,
     },
-    {'id': 'odometer', 'label': 'Odometer Photo', 'icon': LucideIcons.gauge},
-    {'id': 'stepney_tyre', 'label': 'Stepney Tyre', 'icon': LucideIcons.disc},
-    {'id': 'umbrella', 'label': 'Umbrella', 'icon': LucideIcons.umbrella},
-    {'id': 'battery', 'label': 'Battery', 'icon': LucideIcons.battery},
+    {'id': 'corner_1', 'label': 'Corner View 1', 'icon': LucideIcons.scan},
+    {'id': 'corner_2', 'label': 'Corner View 2', 'icon': LucideIcons.scan},
+    {'id': 'corner_3', 'label': 'Corner View 3', 'icon': LucideIcons.scan},
+    {'id': 'corner_4', 'label': 'Corner View 4', 'icon': LucideIcons.scan},
     {
-      'id': 'engine_compartment',
+      'id': 'engine',
       'label': 'Engine Compartment',
-      'icon': LucideIcons.container,
+      'icon': LucideIcons.settings,
     },
-    {
-      'id': 'corner_view_1',
-      'label': 'Corner View 1',
-      'icon': LucideIcons.maximize,
-    },
-    {
-      'id': 'corner_view_2',
-      'label': 'Corner View 2',
-      'icon': LucideIcons.maximize,
-    },
-    {
-      'id': 'corner_view_3',
-      'label': 'Corner View 3',
-      'icon': LucideIcons.maximize,
-    },
-    {
-      'id': 'corner_view_4',
-      'label': 'Corner View 4',
-      'icon': LucideIcons.maximize,
-    },
-    {
-      'id': 'dents_scratches',
-      'label': 'Dents & Scratches',
-      'icon': LucideIcons.scan,
-    },
-    {
-      'id': 'interior_cabin',
-      'label': 'Interior / Cabin',
-      'icon': LucideIcons.armchair,
-    },
-    {
-      'id': 'dikki_trunk',
-      'label': 'Dikki / Trunk',
-      'icon': LucideIcons.package,
-    },
-    {'id': 'tool_kit', 'label': 'Tool Kit', 'icon': LucideIcons.wrench},
-    {
-      'id': 'valuables_check',
-      'label': 'Valuables Check',
-      'icon': LucideIcons.briefcase,
-    },
+    {'id': 'trunk', 'label': 'Trunk Photo', 'icon': LucideIcons.shoppingBag},
+    {'id': 'stepney', 'label': 'Stepney Tyre', 'icon': LucideIcons.disc},
+    {'id': 'odo', 'label': 'ODO Photo', 'icon': LucideIcons.gauge},
+    {'id': 'interior_1', 'label': 'Interior 1', 'icon': LucideIcons.armchair},
+    {'id': 'interior_2', 'label': 'Interior 2', 'icon': LucideIcons.armchair},
+    {'id': 'tools', 'label': 'Toolkit', 'icon': LucideIcons.wrench},
+    {'id': 'valuables', 'label': 'Valuables', 'icon': LucideIcons.briefcase},
   ];
 
   final List<String> _additionalPhotos = [];
@@ -133,12 +105,17 @@ class _CheckInScreenState extends State<CheckInScreen> {
       {'id': 'tyres', 'label': 'Tyres'},
       {'id': 'stepney_tyre', 'label': 'Stepney Tyre'},
     ],
+    'Accessories': [
+      {'id': 'mobile_stand', 'label': 'Mobile Stand'},
+      {'id': 'tissue', 'label': 'Tissue'},
+      {'id': 'perfume', 'label': 'Perfume'},
+    ],
   };
 
   @override
   void initState() {
     super.initState();
-    _loadDCChargeCount();
+    // Load AC charge count from selected vehicle if any (handled in _searchVehicle)
     // Initialize checklist with null (unchecked)
     _inspectionSections.forEach((section, items) {
       for (var item in items) {
@@ -195,16 +172,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
       setState(() {
         _selectedVehicle = foundVehicle;
         _isSearching = false;
-        // Load DC charge count from vehicle metadata (optional field)
-        try {
-          _consecutiveDCCharges =
-              foundVehicle.toJson()['consecutive_dc_charges'] ?? 0;
-          _dcChargingBlocked = _consecutiveDCCharges >= 5;
-        } catch (e) {
-          // Field doesn't exist yet, use defaults
-          _consecutiveDCCharges = 0;
-          _dcChargingBlocked = false;
-        }
+        // Load AC charge count from vehicle
+        _acChargeCount = foundVehicle.acChargeCount;
+        _acChargingBlocked = _acChargeCount >= 6;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -542,37 +512,40 @@ class _CheckInScreenState extends State<CheckInScreen> {
     }
   }
 
-  Future<void> _loadDCChargeCount() async {
-    // This will be called when a vehicle is selected
-    // For now, we'll load it from the vehicle's metadata
-  }
-
-  Future<void> _updateDCChargeCount() async {
+  Future<void> _updateChargeCount() async {
     if (_selectedVehicle == null || _selectedChargingType == null) return;
 
     try {
       final provider = context.read<AppProvider>();
 
-      if (_selectedChargingType == 'dc') {
-        _consecutiveDCCharges++;
+      if (_selectedChargingType == 'ac') {
+        // Increment AC charge count
+        _acChargeCount++;
         setState(() {
-          _dcChargingBlocked = _consecutiveDCCharges >= 5;
+          _acChargingBlocked = _acChargeCount >= 6;
         });
+
+        // Update vehicle with new AC count
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
-          'consecutive_dc_charges': _consecutiveDCCharges,
+          'ac_charge_count': _acChargeCount,
         });
-      } else if (_selectedChargingType == 'ac') {
-        // Reset counter when AC is used
-        _consecutiveDCCharges = 0;
+
+        debugPrint('✅ AC charge count updated: $_acChargeCount/6');
+      } else if (_selectedChargingType == 'dc') {
+        // Reset AC counter when DC is used
+        _acChargeCount = 0;
         setState(() {
-          _dcChargingBlocked = false;
+          _acChargingBlocked = false;
         });
+
         await provider.updateVehicleSummary(_selectedVehicle!.id, {
-          'consecutive_dc_charges': 0,
+          'ac_charge_count': 0,
         });
+
+        debugPrint('✅ AC charge count reset after DC charge');
       }
     } catch (e) {
-      debugPrint('Warning: Could not update DC charge count: $e');
+      debugPrint('Warning: Could not update AC charge count: $e');
       // Continue with check-in even if counter update fails
     }
   }
@@ -596,11 +569,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
-    // Check DC charging limit
-    if (_selectedChargingType == 'dc' && _dcChargingBlocked) {
+    // Check AC charging limit
+    if (_selectedChargingType == 'ac' && _acChargingBlocked) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('DC charging blocked! Please use AC charging first.'),
+          content: Text(
+            'AC charging reaches limit! Please perform 1 DC charge to reset.',
+          ),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
         ),
@@ -615,8 +590,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
         '🚗 Starting check-in process for ${_selectedVehicle!.vehicleNumber}',
       );
 
-      // 1. Update DC charge counter
-      await _updateDCChargeCount();
+      // 1. Update charge counter
+      await _updateChargeCount();
 
       // 2. Save inspection checklist to database
       final Map<String, dynamic> cleanedChecklist = {};
@@ -1165,6 +1140,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     const SizedBox(height: 24),
                     _buildSelectedVehicle(),
 
+                    const SizedBox(height: 16),
+                    _buildAddIssueButton(),
+
+                    if (_reportedIssues.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildSectionTitle('Reported Issues'),
+                      const SizedBox(height: 12),
+                      _buildIssuesSection(),
+                    ],
+
                     const SizedBox(height: 24),
                     _buildSectionTitle('Purpose of Ride'),
                     const SizedBox(height: 12),
@@ -1255,18 +1240,24 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
                     const SizedBox(height: 24),
                     _buildSectionTitle('Charging Type'),
-                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 12),
+                      child: Text(
+                        _acChargingBlocked
+                            ? 'AC charging limit reached (6/6). DC charge required!'
+                            : 'AC charging: $_acChargeCount/6. ${6 - _acChargeCount} charges left before mandatory DC reset.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _acChargingBlocked
+                              ? Colors.red
+                              : const Color(0xFF6B7280),
+                          fontWeight: _acChargingBlocked
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
                     _buildChargingTypeSelection(),
-
-                    if (_reportedIssues.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _buildSectionTitle('Reported Issues'),
-                      const SizedBox(height: 12),
-                      _buildIssuesSection(),
-                    ],
-
-                    const SizedBox(height: 24),
-                    _buildAddIssueButton(),
                   ],
                 ],
               ),
@@ -1296,6 +1287,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
         setState(() {
           _selectedVehicle = vehicle;
           _isSearching = false;
+          // Load AC charge count from vehicle
+          _acChargeCount = vehicle.acChargeCount;
+          _acChargingBlocked = _acChargeCount >= 6;
         });
       },
       child: Container(
@@ -1458,6 +1452,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 final id = item['id']!;
                 final label = item['label']!;
                 final value = _inspectionChecklist[id];
+                final isAccessories = sectionTitle == 'Accessories';
 
                 return Container(
                   padding: const EdgeInsets.symmetric(
@@ -1487,10 +1482,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // OK Button
+                      // Yes/OK Button
                       _compactCheckButton(
                         icon: LucideIcons.check,
-                        label: 'OK',
+                        label: isAccessories ? 'Yes' : 'OK',
                         isSelected: value == true,
                         color: AppTheme.successGreen,
                         onTap: () {
@@ -1502,10 +1497,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         },
                       ),
                       const SizedBox(width: 8),
-                      // Issue Button
+                      // No/Issue Button
                       _compactCheckButton(
                         icon: LucideIcons.x,
-                        label: 'Issue',
+                        label: isAccessories ? 'No' : 'Issue',
                         isSelected: value == false,
                         color: AppTheme.dangerRed,
                         onTap: () {
@@ -1660,24 +1655,33 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   Widget _buildChargingTypeCard(String label, String type) {
     final isSelected = _selectedChargingType == type;
-    final isDCBlocked = type == 'dc' && _dcChargingBlocked;
+    final isBlocked = type == 'ac' && _acChargingBlocked;
     final showWarning =
-        type == 'dc' && _consecutiveDCCharges >= 3 && !_dcChargingBlocked;
+        type == 'ac' && _acChargeCount >= 4 && !_acChargingBlocked;
 
     return InkWell(
-      onTap: isDCBlocked
-          ? null
+      onTap: isBlocked
+          ? () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'AC Charging reached limit (6/6). Please perform 1 DC charge!',
+                  ),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           : () {
               setState(() {
                 _selectedChargingType = type;
               });
             },
       child: Opacity(
-        opacity: isDCBlocked ? 0.6 : 1.0,
+        opacity: isBlocked ? 0.6 : 1.0,
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: isDCBlocked
+            color: isBlocked
                 ? Colors.red.withOpacity(0.1)
                 : showWarning
                 ? Colors.orange.withOpacity(0.1)
@@ -1686,14 +1690,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDCBlocked
+              color: isBlocked
                   ? Colors.red
                   : showWarning
                   ? Colors.orange
                   : isSelected
                   ? AppTheme.primaryGreen
                   : const Color(0xFFE5E7EB),
-              width: (isSelected || isDCBlocked || showWarning) ? 2 : 1,
+              width: (isSelected || isBlocked || showWarning) ? 2 : 1,
             ),
           ),
           child: Column(
@@ -1702,8 +1706,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   Icon(
-                    isDCBlocked ? LucideIcons.ban : LucideIcons.zap,
-                    color: isDCBlocked
+                    isBlocked ? LucideIcons.ban : LucideIcons.zap,
+                    color: isBlocked
                         ? Colors.red
                         : showWarning
                         ? Colors.orange
@@ -1712,7 +1716,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         : const Color(0xFF6B7280),
                     size: 32,
                   ),
-                  if (type == 'dc' && _consecutiveDCCharges > 0)
+                  if (type == 'ac')
                     Positioned(
                       right: -8,
                       top: -8,
@@ -1722,15 +1726,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _consecutiveDCCharges >= 5
+                          color: _acChargeCount >= 6
                               ? Colors.red
-                              : _consecutiveDCCharges >= 3
+                              : _acChargeCount >= 4
                               ? Colors.orange
                               : Colors.blue,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '$_consecutiveDCCharges/5',
+                          '$_acChargeCount/6',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -1747,7 +1751,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color: isDCBlocked
+                  color: isBlocked
                       ? Colors.red
                       : showWarning
                       ? Colors.orange
@@ -1757,11 +1761,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              if (isDCBlocked)
+              if (isBlocked)
                 const Padding(
                   padding: EdgeInsets.only(top: 4),
                   child: Text(
-                    'Use AC first!',
+                    'DC charge required!',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.red,
@@ -1769,11 +1773,23 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     ),
                   ),
                 ),
-              if (showWarning && !isDCBlocked)
+              if (type == 'dc' && _acChargeCount >= 6)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Mandatory reset',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.primaryGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (showWarning && !isBlocked)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    '${5 - _consecutiveDCCharges} left',
+                    '${6 - _acChargeCount} left',
                     style: const TextStyle(
                       fontSize: 11,
                       color: Colors.orange,

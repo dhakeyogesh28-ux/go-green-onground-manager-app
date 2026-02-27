@@ -308,6 +308,9 @@ class AppProvider with ChangeNotifier {
         statusCounts[statusName] = (statusCounts[statusName] ?? 0) + 1;
       }
       debugPrint('📊 Vehicle status distribution: $statusCounts');
+      final inCount = _vehicles.where((v) => v.isVehicleIn).length;
+      final outCount = _vehicles.where((v) => !v.isVehicleIn).length;
+      debugPrint('📊 Vehicle In/Out: In=$inCount, Out=$outCount');
     } catch (e) {
       _vehiclesError = e.toString();
       debugPrint('❌ AppProvider: Error loading vehicles: $e');
@@ -1052,6 +1055,7 @@ class AppProvider with ChangeNotifier {
       if (vehicleIndex != -1) {
         _vehicles[vehicleIndex] = updatedVehicle;
         debugPrint('✅ AppProvider: Local vehicle state updated for $vehicleId');
+        debugPrint('   is_vehicle_in: ${updatedVehicle.isVehicleIn}');
       }
 
       notifyListeners();

@@ -735,10 +735,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
           'status': issueItems.isNotEmpty
               ? 'maintenance'
               : 'charging', // Set to maintenance if issues found
-          'battery_level': _batteryPercentage.round(),
           'last_charge_type': _selectedChargingType?.toUpperCase() ?? 'AC',
           'last_charging_type': _selectedChargingType?.toUpperCase() ?? 'AC',
-          'battery_health': _batteryPercentage.round(),
           'daily_checks': cleanedChecklist,
           'last_inventory_time': DateTime.now().toIso8601String(),
           'last_inspection_date': DateTime.now().toIso8601String().split(
@@ -784,7 +782,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
             metadata: {
               'vehicle_number': _selectedVehicle!.vehicleNumber,
               'driver_name': _selectedDriver!.name,
-              'battery_percentage': _batteryPercentage.round(),
               'charging_type': _selectedChargingType,
               'issues_reported': issueItems.length,
             },
@@ -844,8 +841,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
             userName: provider.userName ?? provider.userEmail ?? 'Unknown',
             timestamp: DateTime.now(),
             metadata: {
-              'battery_percentage': _batteryPercentage.round(),
               'charging_type': _selectedChargingType,
+              'ac_charge_count': _acChargeCount,
               'inspection_items_checked': cleanedChecklist.length,
               'photos_captured':
                   _inventoryPhotos.values.where((v) => v != null).length +
@@ -1013,6 +1010,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
       }
 
       if (mounted) {
+        // Await a fresh load to ensure dashboard sees updated counts BEFORE navigating back
+        debugPrint('🔄 Refreshing vehicles before navigating back...');
+        await provider.loadVehicles(forceRefresh: true);
+        await provider.loadActivities(limit: 20);
+        debugPrint(
+          '✅ Vehicles and activities refreshed — dashboard will see updated counts',
+        );
+
+        // Log in/out counts for debugging
+        final inCount = provider.vehicles.where((v) => v.isVehicleIn).length;
+        final outCount = provider.vehicles.where((v) => !v.isVehicleIn).length;
+        debugPrint('📊 After check-in: In=$inCount, Out=$outCount');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1022,25 +1032,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         );
         context.pop();
-
-        // Refresh data in background (don't await - let it run asynchronously)
-        debugPrint('🔄 Refreshing vehicles and activities in background...');
-        provider
-            .loadVehicles(forceRefresh: true)
-            .then((_) {
-              debugPrint('✅ Vehicles refreshed');
-            })
-            .catchError((e) {
-              debugPrint('⚠️ Background refresh failed: $e');
-            });
-        provider
-            .loadActivities(limit: 20)
-            .then((_) {
-              debugPrint('✅ Activities refreshed');
-            })
-            .catchError((e) {
-              debugPrint('⚠️ Background activity refresh failed: $e');
-            });
       }
     } catch (e) {
       debugPrint('❌ Error during check-in: $e');
@@ -1063,17 +1054,23 @@ class _CheckInScreenState extends State<CheckInScreen> {
     final filteredVehicles = _getFilteredVehicles(allVehicles);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.x, color: Colors.black),
+          icon: Icon(
+            LucideIcons.x,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
+        title: Text(
           'Check In Vehicle',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Theme.of(context).textTheme.titleLarge?.color,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: Column(
@@ -1111,14 +1108,20 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         },
                       ),
                       filled: true,
-                      fillColor: const Color(0xFFF9FAFB),
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withOpacity(0.05)
+                          : const Color(0xFFF9FAFB),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -1176,17 +1179,20 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         hintText: 'Enter driver remarks here...',
                         hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
                         filled: true,
-                        fillColor: const Color(0xFFF9FAFB),
+                        fillColor:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(0.05)
+                            : const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerColor,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerColor,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
@@ -1211,11 +1217,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
                           color: Color(0xFF9CA3AF),
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF9FAFB),
+                        fillColor:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(0.05)
+                            : const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerColor,
                           ),
                         ),
                       ),
@@ -1227,11 +1236,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     _buildSectionTitle('Inspection Checklist'),
                     const SizedBox(height: 12),
                     _buildStaticInspectionChecklist(),
-
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Battery Level'),
-                    const SizedBox(height: 12),
-                    _buildBatteryPercentageSlider(),
 
                     const SizedBox(height: 24),
                     _buildSectionTitle('Interior Cleaning Status'),
@@ -1273,10 +1277,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF111827),
+        color: Theme.of(context).textTheme.titleMedium?.color,
       ),
     );
   }
@@ -1296,9 +1300,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           children: [
@@ -1402,9 +1406,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
   Widget _buildStaticInspectionChecklist() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: _inspectionSections.entries.map((entry) {
@@ -1439,10 +1443,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     const SizedBox(width: 8),
                     Text(
                       sectionTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: Color(0xFF111827),
+                        color: Theme.of(context).textTheme.titleMedium?.color,
                       ),
                     ),
                   ],
@@ -1461,7 +1465,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: value == null
-                        ? Colors.white
+                        ? Theme.of(context).cardColor
                         : value
                         ? AppTheme.successGreen.withOpacity(0.05)
                         : AppTheme.dangerRed.withOpacity(0.05),
@@ -1474,9 +1478,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
                       Expanded(
                         child: Text(
                           label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF374151),
+                            color: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.color,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1562,93 +1568,64 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
   }
 
-  Widget _buildBatteryPercentageSlider() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Battery Level',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_batteryPercentage.round()}%',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppTheme.primaryBlue,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SliderTheme(
-            data: SliderThemeData(
-              activeTrackColor: AppTheme.primaryBlue,
-              inactiveTrackColor: const Color(0xFFE5E7EB),
-              thumbColor: AppTheme.primaryBlue,
-              overlayColor: AppTheme.primaryBlue.withOpacity(0.2),
-              trackHeight: 6,
-            ),
-            child: Slider(
-              value: _batteryPercentage,
-              min: 0,
-              max: 100,
-              divisions: 100,
-              onChanged: (value) {
-                setState(() {
-                  _batteryPercentage = value;
-                });
-              },
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '0%',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              Text(
-                '100%',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildChargingTypeSelection() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildChargingTypeCard('AC Charging', 'ac')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildChargingTypeCard('DC Fast Charging', 'dc')),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            _acChargingBlocked
+                ? "AC charging limit reached! Please do DC charge."
+                : _acChargeCount >= 4
+                ? "Warning: ${6 - _acChargeCount} AC charges remaining"
+                : "Your next charging is AC",
+            style: TextStyle(
+              fontSize: 14,
+              color: _acChargingBlocked
+                  ? Colors.red
+                  : _acChargeCount >= 4
+                  ? Colors.orange
+                  : Colors.blue,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: _buildChargingTypeCard('AC Charging', 'ac')),
+            const SizedBox(width: 12),
+            Expanded(child: _buildChargingTypeCard('DC Fast Charging', 'dc')),
+          ],
+        ),
+        if (_acChargeCount >= 4 && !_acChargingBlocked)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.info, color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Warning: ${6 - _acChargeCount} AC charges remaining before DC is mandatory.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -361,9 +361,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             Expanded(
                                               child: Text(
                                                 activity.userName,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Color(0xFF374151),
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium?.color,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -425,9 +427,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                 batteryPercent != null
                                                     ? '$batteryPercent%'
                                                     : 'N/A',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Color(0xFF374151),
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium?.color,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),

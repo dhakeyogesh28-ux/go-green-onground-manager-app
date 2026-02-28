@@ -105,7 +105,8 @@ class SupabaseService {
       try {
         attempts++;
 
-        // Step 1: Perform the update without .select() to avoid PGRST116
+        // Step 1: Perform the update without .select().maybeSingle()
+        // This avoids PGRST116 error when 0 rows match
         await _client
             .from('crm_vehicles')
             .update(data)

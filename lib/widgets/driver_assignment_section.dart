@@ -21,7 +21,8 @@ class DriverAssignmentSection extends StatefulWidget {
   });
 
   @override
-  State<DriverAssignmentSection> createState() => _DriverAssignmentSectionState();
+  State<DriverAssignmentSection> createState() =>
+      _DriverAssignmentSectionState();
 }
 
 class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
@@ -35,7 +36,7 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
   void initState() {
     super.initState();
     _selectedDriver = widget.initialDriver;
-    
+
     // Load last assigned driver if vehicle ID is provided
     if (widget.vehicleId != null && _selectedDriver == null) {
       _loadLastAssignedDriver();
@@ -50,11 +51,13 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
 
   Future<void> _loadLastAssignedDriver() async {
     if (widget.vehicleId == null) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final driver = await DriverService.getLastAssignedDriver(widget.vehicleId!);
+      final driver = await DriverService.getLastAssignedDriver(
+        widget.vehicleId!,
+      );
       if (driver != null && mounted) {
         setState(() {
           _selectedDriver = driver;
@@ -87,7 +90,7 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
         query,
         hubId: widget.hubId,
       );
-      
+
       if (mounted) {
         setState(() {
           _searchResults = results;
@@ -147,10 +150,10 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
             const SizedBox(width: 8),
             Text(
               widget.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF111827),
+                color: Theme.of(context).textTheme.titleMedium?.color,
               ),
             ),
           ],
@@ -206,14 +209,16 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
               )
             : null,
         filled: true,
-        fillColor: const Color(0xFFF9FAFB),
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withOpacity(0.05)
+            : const Color(0xFFF9FAFB),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -252,10 +257,10 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
               children: [
                 Text(
                   _selectedDriver!.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: Color(0xFF111827),
+                    color: Theme.of(context).textTheme.titleMedium?.color,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -316,9 +321,9 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
     return Container(
       constraints: const BoxConstraints(maxHeight: 300),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -348,10 +353,7 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
             ),
             title: Text(
               driver.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +366,10 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
                 if (driver.licenseNumber != null)
                   Text(
                     'License: ${driver.licenseNumber}',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
                   ),
               ],
             ),
@@ -384,25 +389,20 @@ class _DriverAssignmentSectionState extends State<DriverAssignmentSection> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withOpacity(0.05)
+            : const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         children: [
-          const Icon(
-            LucideIcons.searchX,
-            color: Color(0xFF9CA3AF),
-            size: 20,
-          ),
+          const Icon(LucideIcons.searchX, color: Color(0xFF9CA3AF), size: 20),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
               'No drivers found. Try a different search term.',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
             ),
           ),
         ],

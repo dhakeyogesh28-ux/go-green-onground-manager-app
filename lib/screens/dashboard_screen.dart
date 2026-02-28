@@ -327,7 +327,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   cells: [
                                     DataCell(
                                       SizedBox(
-                                        width: 80,
+                                        width: 120,
                                         child: Text(
                                           activity.vehicleNumber,
                                           style: TextStyle(

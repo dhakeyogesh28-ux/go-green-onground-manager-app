@@ -104,17 +104,22 @@ class SupabaseService {
     while (attempts < 3) {
       try {
         attempts++;
-        final response = await _client
+
+        // Step 1: Perform the update without .select() to avoid PGRST116
+        await _client
             .from('crm_vehicles')
             .update(data)
-            .eq('vehicle_id', vehicleId)
+            .eq('vehicle_id', vehicleId);
+
+        // Step 2: Fetch the updated vehicle separately
+        final response = await _client
+            .from('crm_vehicles')
             .select('*')
+            .eq('vehicle_id', vehicleId)
             .maybeSingle();
 
         if (response == null) {
-          throw Exception(
-            'Vehicle not found or update denied for ID: $vehicleId',
-          );
+          throw Exception('Vehicle not found after update for ID: $vehicleId');
         }
 
         debugPrint('✅ Update response: $response');

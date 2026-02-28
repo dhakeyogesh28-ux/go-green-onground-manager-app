@@ -1,0 +1,175 @@
+﻿Running Gradle task 'assembleRelease'...                        
+Font asset "lucide.ttf" was tree-shaken, reducing it from 413764 to 22672 bytes (94.5% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 848 bytes (99.7% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 1868 bytes (99.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+flutter : ERROR: Missing 
+classes detected while 
+running R8. Please add the 
+missing classes or apply 
+additional keep rules that 
+are generated in C:\Antigravi
+ty\go_green-main\go-green-ong
+round-manager-app\build\app\o
+utputs\mapping\release\missin
+g_rules.txt.
+At line:1 char:1
++ flutter build apk 
+--release 2>&1 | Out-File 
+-FilePath build_err.txt - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo           
+   : NotSpecified: (ERROR:   
+  Missing ...sing_rules.tx   
+ t.:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+ERROR: R8: Missing class com.
+google.mlkit.vision.text.chin
+ese.ChineseTextRecognizerOpti
+ons$Builder (referenced 
+from: com.google.mlkit.vision
+.text.TextRecognizer com.goog
+le_mlkit_text_recognition.Tex
+tRecognizer.initialize(io.flu
+tter.plugin.common.MethodCall
+))
+Missing class com.google.mlki
+t.vision.text.chinese.Chinese
+TextRecognizerOptions 
+(referenced from: com.google.
+mlkit.vision.text.TextRecogni
+zer com.google_mlkit_text_rec
+ognition.TextRecognizer.initi
+alize(io.flutter.plugin.commo
+n.MethodCall))
+Missing class com.google.mlki
+t.vision.text.devanagari.Deva
+nagariTextRecognizerOptions$B
+uilder (referenced from: com.
+google.mlkit.vision.text.Text
+Recognizer com.google_mlkit_t
+ext_recognition.TextRecognize
+r.initialize(io.flutter.plugi
+n.common.MethodCall))
+Missing class com.google.mlki
+t.vision.text.devanagari.Deva
+nagariTextRecognizerOptions 
+(referenced from: com.google.
+mlkit.vision.text.TextRecogni
+zer com.google_mlkit_text_rec
+ognition.TextRecognizer.initi
+alize(io.flutter.plugin.commo
+n.MethodCall))
+Missing class com.google.mlki
+t.vision.text.japanese.Japane
+seTextRecognizerOptions$Build
+er (referenced from: com.goog
+le.mlkit.vision.text.TextReco
+gnizer com.google_mlkit_text_
+recognition.TextRecognizer.in
+itialize(io.flutter.plugin.co
+mmon.MethodCall))
+Missing class com.google.mlki
+t.vision.text.japanese.Japane
+seTextRecognizerOptions 
+(referenced from: com.google.
+mlkit.vision.text.TextRecogni
+zer com.google_mlkit_text_rec
+ognition.TextRecognizer.initi
+alize(io.flutter.plugin.commo
+n.MethodCall))
+Missing class com.google.mlki
+t.vision.text.korean.KoreanTe
+xtRecognizerOptions$Builder 
+(referenced from: com.google.
+mlkit.vision.text.TextRecogni
+zer com.google_mlkit_text_rec
+ognition.TextRecognizer.initi
+alize(io.flutter.plugin.commo
+n.MethodCall))
+Missing class com.google.mlki
+t.vision.text.korean.KoreanTe
+xtRecognizerOptions 
+(referenced from: com.google.
+mlkit.vision.text.TextRecogni
+zer com.google_mlkit_text_rec
+ognition.TextRecognizer.initi
+alize(io.flutter.plugin.commo
+n.MethodCall))
+
+FAILURE: Build completed 
+with 2 failures.
+
+1: Task failed with an 
+exception.
+-----------
+* What went wrong:
+Execution failed for task ':g
+oogle_mlkit_commons:verifyRel
+easeResources'.
+> A failure occurred while 
+executing com.android.build.g
+radle.tasks.VerifyLibraryReso
+urcesTask$Action
+   > Android resource 
+linking failed
+     ERROR: C:\Antigravity\go
+_green-main\go-green-onground
+-manager-app\build\google_mlk
+it_commons\intermediates\merg
+ed_res\release\mergeReleaseRe
+sources\values\values.xml:221
+: AAPT: error: resource 
+android:attr/lStar not found.
+
+
+* Try:
+> Run with --stacktrace 
+option to get the stack 
+trace.
+> Run with --info or --debug 
+option to get more log 
+output.
+> Run with --scan to get 
+full insights.
+> Get more help at 
+https://help.gradle.org.
+=============================
+=============================
+====================
+
+2: Task failed with an 
+exception.
+-----------
+* What went wrong:
+Execution failed for task 
+':app:minifyReleaseWithR8'.
+> A failure occurred while 
+executing com.android.build.g
+radle.internal.tasks.R8Task$R
+8Runnable
+   > Compilation failed to 
+complete
+
+* Try:
+> Run with --stacktrace 
+option to get the stack 
+trace.
+> Run with --info or --debug 
+option to get more log 
+output.
+> Run with --scan to get 
+full insights.
+> Get more help at 
+https://help.gradle.org.
+=============================
+=============================
+====================
+
+BUILD FAILED in 1m 11s
+Running Gradle task 'assembleRelease'...                           71.7s
+Gradle task assembleRelease 
+failed with exit code 1

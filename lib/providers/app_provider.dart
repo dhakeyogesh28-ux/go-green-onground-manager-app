@@ -141,6 +141,13 @@ class AppProvider with ChangeNotifier {
       _userName = prefs.getString('userName');
       _userMobile = prefs.getString('userMobile');
 
+      // Migrate old hub name spelling
+      if (_selectedHub == 'Pune Hinjewadi') {
+        _selectedHub = 'Pune Hinjawadi';
+        await prefs.setString('selectedHub', _selectedHub!);
+        debugPrint('🔄 Migrated hub name: Pune Hinjewadi → Pune Hinjawadi');
+      }
+
       // Load Theme and Language
       final themeStr = prefs.getString('themeMode') ?? 'light';
       _themeMode = themeStr == 'dark' ? ThemeMode.dark : ThemeMode.light;
@@ -1485,7 +1492,7 @@ class AppProvider with ChangeNotifier {
 
   static const List<String> availableHubs = [
     'Nashik',
-    'Pune Hinjewadi',
+    'Pune Hinjawadi',
     'Pune Kharadi',
   ];
 

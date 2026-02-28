@@ -1,0 +1,98 @@
+﻿Running Gradle task 'assembleRelease'...                        
+flutter : warning: [options] 
+source value 8 is obsolete 
+and will be removed in a 
+future release
+At line:1 char:1
++ flutter build apk 
+--release 2>&1 | Out-File 
+-FilePath build_err3.txt  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo           
+   : NotSpecified: (warning  
+  : [optio... future relea   
+ se:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+warning: [options] target 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] To 
+suppress warnings about 
+obsolete options, use 
+-Xlint:-options.
+Note: C:\Users\heths\AppData\
+Local\Pub\Cache\hosted\pub.de
+v\google_mlkit_commons-0.6.1\
+android\src\main\java\com\goo
+gle_mlkit_commons\InputImageC
+onverter.java uses unchecked 
+or unsafe operations.
+Note: Recompile with 
+-Xlint:unchecked for details.
+3 warnings
+warning: [options] source 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] target 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] To 
+suppress warnings about 
+obsolete options, use 
+-Xlint:-options.
+Note: C:\Users\heths\AppData\
+Local\Pub\Cache\hosted\pub.de
+v\google_mlkit_object_detecti
+on-0.11.0\android\src\main\ja
+va\com\google_mlkit_object_de
+tection\ObjectDetector.java 
+uses unchecked or unsafe 
+operations.
+Note: Recompile with 
+-Xlint:unchecked for details.
+3 warnings
+warning: [options] source 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] target 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] To 
+suppress warnings about 
+obsolete options, use 
+-Xlint:-options.
+Note: C:\Users\heths\AppData\
+Local\Pub\Cache\hosted\pub.de
+v\google_mlkit_text_recogniti
+on-0.11.0\android\src\main\ja
+va\com\google_mlkit_text_reco
+gnition\TextRecognizer.java 
+uses unchecked or unsafe 
+operations.
+Note: Recompile with 
+-Xlint:unchecked for details.
+3 warnings
+warning: [options] source 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] target 
+value 8 is obsolete and will 
+be removed in a future 
+release
+warning: [options] To 
+suppress warnings about 
+obsolete options, use 
+-Xlint:-options.
+3 warnings
+Running Gradle task 'assembleRelease'...                          122.3s
+ΓêÜ Built build\app\outputs\flutter-apk\app-release.apk (116.0MB)

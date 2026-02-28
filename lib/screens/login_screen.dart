@@ -43,7 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+                minHeight:
+                    MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom,
               ),
               child: IntrinsicHeight(
                 child: Column(
@@ -96,7 +99,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const Spacer(),
                     Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                       padding: const EdgeInsets.all(32),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -105,31 +111,44 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-
                           // Hub selection dropdown
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(LucideIcons.mapPin, color: Colors.grey, size: 20),
+                                const Icon(
+                                  LucideIcons.mapPin,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: _selectedHub,
                                       isExpanded: true,
-                                      icon: const Icon(LucideIcons.chevronDown, size: 20),
+                                      icon: const Icon(
+                                        LucideIcons.chevronDown,
+                                        size: 20,
+                                      ),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         color: AppTheme.textDark,
                                         fontWeight: FontWeight.w500,
                                       ),
-                                      items: AppProvider.availableHubs.map((String hub) {
+                                      items: AppProvider.availableHubs.map((
+                                        String hub,
+                                      ) {
                                         return DropdownMenuItem<String>(
                                           value: hub,
                                           child: Text(hub),
@@ -152,22 +171,33 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(color: Color(0xFF111827)),
                             decoration: InputDecoration(
-                              prefixIcon: const Icon(LucideIcons.mail, color: Color(0xFF6B7280)),
+                              prefixIcon: const Icon(
+                                LucideIcons.mail,
+                                color: Color(0xFF6B7280),
+                              ),
                               hintText: l10n.email,
                               filled: true,
                               fillColor: const Color(0xFFF9FAFB),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                                borderSide: const BorderSide(
+                                  color: AppTheme.primaryGreen,
+                                  width: 2,
+                                ),
                               ),
                             ),
                           ),
@@ -175,26 +205,44 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _passwordController,
                             obscureText: !_showPassword,
+                            style: const TextStyle(color: Color(0xFF111827)),
                             decoration: InputDecoration(
-                              prefixIcon: const Icon(LucideIcons.lock, color: Color(0xFF6B7280)),
+                              prefixIcon: const Icon(
+                                LucideIcons.lock,
+                                color: Color(0xFF6B7280),
+                              ),
                               suffixIcon: IconButton(
-                                icon: Icon(_showPassword ? LucideIcons.eyeOff : LucideIcons.eye, color: const Color(0xFF6B7280)),
-                                onPressed: () => setState(() => _showPassword = !_showPassword),
+                                icon: Icon(
+                                  _showPassword
+                                      ? LucideIcons.eyeOff
+                                      : LucideIcons.eye,
+                                  color: const Color(0xFF6B7280),
+                                ),
+                                onPressed: () => setState(
+                                  () => _showPassword = !_showPassword,
+                                ),
                               ),
                               hintText: l10n.password,
                               filled: true,
                               fillColor: const Color(0xFFF9FAFB),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                                borderSide: const BorderSide(
+                                  color: AppTheme.primaryGreen,
+                                  width: 2,
+                                ),
                               ),
                             ),
                           ),
@@ -212,42 +260,46 @@ class _LoginScreenState extends State<LoginScreen> {
                                 elevation: 0,
                               ),
                               onPressed: () async {
-                              final email = _emailController.text.trim();
-                              final password = _passwordController.text;
-                              
-                              // Validate inputs
-                              if (email.isEmpty || password.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter email and password'),
-                                    backgroundColor: AppTheme.dangerRed,
-                                  ),
-                                );
-                                return;
-                              }
-                              
-                              // Validate credentials against database
-                              final provider = context.read<AppProvider>();
-                              final userData = await provider.validateLogin(
-                                email,
-                                password,
-                                _selectedHub,
-                              );
-                              
-                              if (userData != null) {
-                                debugPrint('Login successful for $email at $_selectedHub');
-                                await provider.login(userData);
-                              } else {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Invalid credentials or hub mismatch for $_selectedHub',
+                                final email = _emailController.text.trim();
+                                final password = _passwordController.text;
+
+                                // Validate inputs
+                                if (email.isEmpty || password.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please enter email and password',
+                                      ),
+                                      backgroundColor: AppTheme.dangerRed,
                                     ),
-                                    backgroundColor: AppTheme.dangerRed,
-                                  ),
+                                  );
+                                  return;
+                                }
+
+                                // Validate credentials against database
+                                final provider = context.read<AppProvider>();
+                                final userData = await provider.validateLogin(
+                                  email,
+                                  password,
+                                  _selectedHub,
                                 );
-                              }
+
+                                if (userData != null) {
+                                  debugPrint(
+                                    'Login successful for $email at $_selectedHub',
+                                  );
+                                  await provider.login(userData);
+                                } else {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Invalid credentials or hub mismatch for $_selectedHub',
+                                      ),
+                                      backgroundColor: AppTheme.dangerRed,
+                                    ),
+                                  );
+                                }
                               },
                               child: Text(
                                 l10n.login,
@@ -258,7 +310,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-
                         ],
                       ),
                     ),
